@@ -1,3 +1,5 @@
+// file: frontend/src/api.js
+
 const API_URL = "http://localhost:8000";
 
 export async function fetchFormations() {
@@ -16,5 +18,29 @@ export async function assignSquad(payload) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+  return res.json();
+}
+
+export async function searchMarketplace(payload) {
+  // payload is { role_name, auth_token }
+  const res = await fetch(`${API_URL}/market/search`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    const detail = data.detail?.message || data.detail || 'An unknown error occurred.';
+    throw new Error(detail);
+  }
+  return data;
+}
+
+export async function fetchFormationMap(formationName) {
+  const res = await fetch(`${API_URL}/formation/${encodeURIComponent(formationName)}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch formation map: ${res.status}`);
+  }
   return res.json();
 }

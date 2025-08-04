@@ -1,4 +1,4 @@
-// file: src/Marketplace.jsx
+// file: frontend/src/Marketplace.jsx
 
 import React, { useState, useEffect } from 'react';
 import * as api from './api';
@@ -25,7 +25,7 @@ export default function Marketplace() {
   }, []);
 
   const handleSearch = async (e) => {
-    e.preventDefault(); // Prevent form from reloading the page
+    e.preventDefault();
     if (!selectedRole || !authToken) {
       setError('Please select a role and provide an auth token.');
       return;
@@ -36,18 +36,23 @@ export default function Marketplace() {
     setResults([]);
 
     try {
-      // We will create searchMarketplace in api.js later
       const data = await api.searchMarketplace({
         role_name: selectedRole,
         auth_token: authToken,
       });
-      setResults(data?.listings ?? []); // API response has a 'listings' key
+      setResults(data ?? []);
     } catch (err) {
       setError('Search failed. Check the token or console for details.');
       console.error(err);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // --- NEW SORTING FUNCTION ---
+  const handleSortByPrice = () => {
+    const sortedResults = [...results].sort((a, b) => a.price - b.price);
+    setResults(sortedResults);
   };
 
   return (
@@ -70,17 +75,16 @@ export default function Marketplace() {
         <label>
           Select Role:
           <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} style={{ width: '100%', marginTop: '5px' }}>
-  <option value="">Select...</option>
-  {/* UPDATE THE CODE IN THIS MAP */}
-  {roles.map(role => {
-    const roleName = role.RoleType || role.Role; // Use whichever key exists
-    return (
-      <option key={roleName} value={roleName}>
-        {roleName} ({role.Position})
-      </option>
-    )
-  })}
-</select>
+            <option value="">Select...</option>
+            {roles.map(role => {
+              const roleName = role.RoleType || role.Role;
+              return (
+                <option key={roleName} value={roleName}>
+                  {roleName} ({role.Position})
+                </option>
+              )
+            })}
+          </select>
         </label>
 
         <button type="submit" disabled={isLoading}>
@@ -88,31 +92,58 @@ export default function Marketplace() {
         </button>
       </form>
 
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {error && <p style={{ color: 'red', marginTop: '15px' }}>{error}</p>}
 
       {results.length > 0 && (
         <>
-          <h3 style={{marginTop: '30px'}}>Search Results</h3>
-          <table style={{width: '100%'}}>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Age</th>
-                <th>Overall</th>
-                <th>Asking Price</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map(p => (
-                <tr key={p.id}>
-                  <td>{p.player.firstName} {p.player.lastName}</td>
-                  <td>{p.player.age}</td>
-                  <td>{p.player.overall}</td>
-                  <td>{p.askingPrice ? `${p.askingPrice.toLocaleString()} credits` : 'N/A'}</td>
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '30px'}}>
+            <h3>Search Results</h3>
+            {/* --- NEW SORT BUTTON --- */}
+            <button onClick={handleSortByPrice}>
+              Sort by Price (Lowest)
+            </button>
+          </div>
+          <div style={{overflowX: 'auto'}}>
+            <table style={{width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap'}}>
+              <thead>
+                <tr style={{textAlign: 'left'}}>
+                  <th style={{padding: '8px'}}>Name</th>
+                  <th style={{padding: '8px'}}>Age</th>
+                  <th style={{padding: '8px'}}>Overall</th>
+                  <th style={{padding: '8px'}}>Price ($)</th>
+                  <th style={{padding: '8px'}}>Positions</th>
+                  <th style={{padding: '8px'}}>PAC</th>
+                  <th style={{padding: '8px'}}>SHO</th>
+                  <th style={{padding: '8px'}}>PAS</th>
+                  <th style={{padding: '8px'}}>DRI</th>
+                  <th style={{padding: '8px'}}>DEF</th>
+                  <th style={{padding: '8px'}}>PHY</th>
+                  <th style={{padding: '8px'}}>GK</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {results.map(listing => {
+                  const p = listing.player.metadata;
+                  return (
+                    <tr key={listing.listingResourceId} style={{borderTop: '1px solid #444'}}>
+                      <td style={{padding: '8px'}}>{p.firstName} {p.lastName}</td>
+                      <td style={{padding: '8px'}}>{p.age}</td>
+                      <td style={{padding: '8px', fontWeight: 'bold'}}>{p.overall}</td>
+                      <td style={{padding: '8px'}}>{listing.price ? `${listing.price.toLocaleString()}` : 'N/A'}</td>
+                      <td style={{padding: '8px'}}>{p.positions.join(', ')}</td>
+                      <td style={{padding: '8px'}}>{p.pace}</td>
+                      <td style={{padding: '8px'}}>{p.shooting}</td>
+                      <td style={{padding: '8px'}}>{p.passing}</td>
+                      <td style={{padding: '8px'}}>{p.dribbling}</td>
+                      <td style={{padding: '8px'}}>{p.defense}</td>
+                      <td style={{padding: '8px'}}>{p.physical}</td>
+                      <td style={{padding: '8px'}}>{p.goalkeeping}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
     </div>

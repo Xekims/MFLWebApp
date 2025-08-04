@@ -119,6 +119,13 @@ def calc_fit(player: pd.Series, role_name: str, tier: str):
 def get_formations():
     return {"formations": list(FORMATION_MAPS.keys())}
 
+@app.get("/formation/{formation_name}")
+def get_formation(formation_name: str):
+    fm = FORMATION_MAPS.get(formation_name)
+    if not fm:
+        raise HTTPException(status_code=404, detail="Formation not found")
+    return fm
+
 @app.get("/roles")
 def get_roles():
     return ROLES_DATA
