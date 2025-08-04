@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 import requests
 import json
 import pandas as pd
@@ -18,7 +18,7 @@ TIER_THRESH = {'Diamond':[97,93,90,87], 'Platinum':[93,90,87,84], 'Gold':[90,87,
 ATTRIBUTE_WEIGHTS = [4, 3, 2, 1]
 ATTR_MAP = {"PAC": "pace", "SHO": "shooting", "PAS": "passing", "DRI": "dribbling", "DEF": "defense", "PHY": "physical", "GK": "goalkeeping"}
 
-# --- Data Loading (now inside functions for easy reloading) ---
+# --- Data Loading ---
 def load_roles():
     with open(ROLES_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -37,25 +37,18 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 # --- Helper functions to save data ---
 def save_roles(data: List[Dict]):
     global ROLES_DATA, ROLE_LOOKUP
-    with open(ROLES_PATH, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+    with open(ROLES_PATH, "w", encoding="utf-8") as f: json.dump(data, f, indent=2)
     ROLES_DATA = data
     ROLE_LOOKUP = {(r.get("Role") or r.get("RoleType") or "").strip().upper(): r for r in ROLES_DATA}
 
 def save_formations(data: Dict):
     global FORMATION_MAPS
-    with open(FORMATIONS_PATH, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
+    with open(FORMATIONS_PATH, "w", encoding="utf-8") as f: json.dump(data, f, indent=4)
     FORMATION_MAPS = data
 
 # --- Pydantic Models ---
 class Role(BaseModel):
-    Role: str
-    Attribute1: str
-    Attribute2: str
-    Attribute3: str
-    Attribute4: str
-    Position: str
+    Role: str; Attribute1: str; Attribute2: str; Attribute3: str; Attribute4: str; Position: str
 class AssignSquadRequest(BaseModel):
     formation_name: str; role_map: Dict[str, str]; tier: str = "Iron"
 class MarketSearchRequest(BaseModel):
@@ -94,9 +87,7 @@ def calc_fit(player: pd.Series, role_name: str, tier: str):
     label = ( "Elite" if score >= 50 else "Strong" if score >= 20 else "Natural" if score >= 0  else "Weak" if score >= -20 else "Unusable" )
     return int(score), label
 
-# --- ALL ENDPOINTS ---
-
-# --- Original GET Endpoints (Restored) ---
+# --- Endpoints ---
 @app.get("/formations")
 def get_formations(): return {"formations": list(FORMATION_MAPS.keys())}
 
@@ -107,30 +98,30 @@ def get_formation(formation_name: str):
     return fm
 
 @app.get("/roles")
-def get_roles():
-    return ROLES_DATA
+def get_roles(): return ROLES_DATA
 
 @app.get("/attributes")
-def get_attributes():
-    return {"attributes": list(ATTR_MAP.keys())}
+def get_attributes(): return {"attributes": list(ATTR_MAP.keys())}
 
+# --- THIS ENDPOINT HAS BEEN RESTORED ---
 @app.get("/player/{player_id}/analysis")
 def get_player_analysis(player_id: int, tier: str = "Iron"):
     players_df = fetch_players()
     player_row = players_df.loc[players_df["id"] == player_id]
-    if player_row.empty: raise HTTPException(status_code=404, detail="Player not found")
+    if player_row.empty:
+        raise HTTPException(status_code=404, detail="Player not found")
     player_series = player_row.iloc[0]
     all_role_scores = []
     for role_data in ROLES_DATA:
         role_name = (role_data.get("Role") or role_data.get("RoleType") or "").strip().upper()
         score, label = calc_fit(player_series, role_name, tier)
-        if label != "Unusable": all_role_scores.append({ "role": role_name, "score": score, "label": label })
+        if label != "Unusable":
+            all_role_scores.append({ "role": role_name, "score": score, "label": label })
     all_role_scores.sort(key=lambda x: x["score"], reverse=True)
     positive_roles = [r for r in all_role_scores if r["score"] >= 0]
     best_role = all_role_scores[0] if all_role_scores else None
     return { "player_attributes": player_series.to_dict(), "best_role": best_role, "positive_roles": positive_roles }
 
-# --- Original POST Endpoints (Restored) ---
 @app.post("/squad/assign")
 def assign_squad(req: AssignSquadRequest):
     players_df = fetch_players()
@@ -185,7 +176,7 @@ def search_market(req: MarketSearchRequest):
     except requests.exceptions.HTTPError as e: raise HTTPException(status_code=e.response.status_code, detail=e.response.json())
     except requests.exceptions.RequestException as e: raise HTTPException(status_code=500, detail=f"Failed to contact marketplace API: {e}")
 
-# --- NEW CRUD Endpoints ---
+# --- CRUD Endpoints ---
 @app.post("/roles", status_code=201)
 def create_role(role: Role):
     roles = load_roles()
@@ -194,7 +185,6 @@ def create_role(role: Role):
     roles.append(role.dict())
     save_roles(roles)
     return role
-
 @app.put("/roles/{role_name}")
 def update_role(role_name: str, updated_role: Role):
     roles = load_roles()
@@ -207,7 +197,6 @@ def update_role(role_name: str, updated_role: Role):
     if not role_found: raise HTTPException(status_code=404, detail="Role not found")
     save_roles(roles)
     return updated_role
-
 @app.delete("/roles/{role_name}", status_code=204)
 def delete_role(role_name: str):
     roles = load_roles()
@@ -216,7 +205,6 @@ def delete_role(role_name: str):
     if len(roles) == initial_len: raise HTTPException(status_code=404, detail="Role not found")
     save_roles(roles)
     return {"message": "Role deleted"}
-
 @app.post("/formations", status_code=201)
 def create_formation(formation: Dict[str, Any] = Body(...)):
     name = list(formation.keys())[0]
@@ -226,7 +214,6 @@ def create_formation(formation: Dict[str, Any] = Body(...)):
     formations[name] = data
     save_formations(formations)
     return formation
-
 @app.put("/formations/{formation_name}")
 def update_formation(formation_name: str, roles: Dict[str, str] = Body(...)):
     formations = load_formations()
@@ -234,7 +221,6 @@ def update_formation(formation_name: str, roles: Dict[str, str] = Body(...)):
     formations[formation_name] = roles
     save_formations(formations)
     return {formation_name: roles}
-
 @app.delete("/formations/{formation_name}", status_code=204)
 def delete_formation(formation_name: str):
     formations = load_formations()

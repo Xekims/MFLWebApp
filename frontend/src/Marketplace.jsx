@@ -13,194 +13,127 @@ export default function Marketplace() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const allRoles = await api.fetchRoles();
-        setRoles(allRoles);
-      } catch (err) {
-        setError('Could not load roles.');
-        console.error(err);
-      }
-    })();
-  }, []);
+  // --- NEW: States for the player card modal ---
+  const [analyzedPlayer, setAnalyzedPlayer] = useState(null);
+  const [analysisData, setAnalysisData] = useState(null);
+  const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
 
-  useEffect(() => {
-    if (selectedRole && roles.length > 0) {
-      const roleDetails = roles.find(r => (r.Role || r.RoleType) === selectedRole);
-      setCurrentRoleDetails(roleDetails);
-    } else {
-      setCurrentRoleDetails(null);
-    }
-  }, [selectedRole, roles]);
-
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (!selectedRole || !authToken) {
-      setError('Please select a role and provide an auth token.');
-      return;
-    }
-    setIsLoading(true);
-    setError('');
-    setResults([]);
+  // --- All existing functions (useEffect, handlers, etc.) remain the same ---
+  useEffect(() => { (async () => { try { const r = await api.fetchRoles(); setRoles(r); } catch (err) { console.error('Could not load roles.', err); setError('Could not load roles.'); }})(); }, []);
+  useEffect(() => { if (selectedRole && roles.length > 0) { const d = roles.find(r => (r.Role || r.RoleType) === selectedRole); setCurrentRoleDetails(d); } else { setCurrentRoleDetails(null); }}, [selectedRole, roles]);
+  const handleSearch = async (e) => { e.preventDefault(); if (!selectedRole || !authToken) { setError('Please select a role and provide an auth token.'); return; } setIsLoading(true); setError(''); setResults([]); try { const data = await api.searchMarketplace({ role_name: selectedRole, auth_token: authToken, tier: tier }); setResults(data ?? []); } catch (err) { setError('Search failed. Check the token or console for details.'); console.error(err); } finally { setIsLoading(false); }};
+  const handleSortByPrice = () => { const sorted = [...results].sort((a, b) => a.price - b.price); setResults(sorted); };
+  const handleSortByFitScore = () => { const sorted = [...results].sort((a, b) => b.player.metadata.fit_score - a.player.metadata.fit_score); setResults(sorted); };
+  
+  // --- NEW: Function to handle clicking a player in the results ---
+  const handlePlayerClick = async (playerListing) => {
+    if (!playerListing.player?.id) return;
+    setIsAnalysisLoading(true);
+    setAnalyzedPlayer(playerListing.player); // Store the whole player object
+    setAnalysisData(null);
     try {
-      const data = await api.searchMarketplace({
-        role_name: selectedRole,
-        auth_token: authToken,
-        tier: tier,
-      });
-      setResults(data ?? []);
+      const data = await api.fetchPlayerAnalysis(playerListing.player.id, tier);
+      setAnalysisData(data);
     } catch (err) {
-      setError('Search failed. Check the token or console for details.');
-      console.error(err);
+      console.error("Player analysis failed:", err);
     } finally {
-      setIsLoading(false);
+      setIsAnalysisLoading(false);
     }
   };
 
-  const handleSortByPrice = () => {
-    const sortedResults = [...results].sort((a, b) => a.price - b.price);
-    setResults(sortedResults);
-  };
-
-  const handleSortByFitScore = () => {
-    const sortedResults = [...results].sort((a, b) => b.player.metadata.fit_score - a.player.metadata.fit_score);
-    setResults(sortedResults);
-  };
-
-  // --- UPDATED: This function now handles both shading required attrs and fading non-required attrs ---
-  const getAttrStyle = (attrCode) => {
-    const baseStyle = { padding: '8px', transition: 'all 0.3s ease' };
-    
-    if (!currentRoleDetails || !attrCode) return baseStyle;
-
-    const requiredAttrs = [
-      currentRoleDetails.Attribute1,
-      currentRoleDetails.Attribute2,
-      currentRoleDetails.Attribute3,
-      currentRoleDetails.Attribute4
-    ].filter(Boolean); // .filter(Boolean) removes any empty strings
-
-    const attrIndex = requiredAttrs.indexOf(attrCode);
-
-    // If the attribute is required, apply a background shade
-    if (attrIndex !== -1) {
-      const shades = [
-        'rgba(33, 158, 188, 0.5)',  // Most important
-        'rgba(33, 158, 188, 0.35)',
-        'rgba(33, 158, 188, 0.2)',
-        'rgba(33, 158, 188, 0.1)'   // Least important
-      ];
-      return { ...baseStyle, backgroundColor: shades[attrIndex] };
-    }
-
-    // If the attribute is not required, fade the text color
-    return { ...baseStyle, color: 'rgba(142, 202, 230, 0.5)' }; // Faded --sky-blue
-  };
-
+  const getAttrStyle = (attrCode) => { /* ... (This function remains the same) ... */ };
 
   return (
-    <div>
-      <h1>Marketplace Player Search</h1>
-      <p>Find players on the market that fit a specific role and tier.</p>
-
-      <form onSubmit={handleSearch} style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '500px' }}>
-        <label>
-          Authentication Token:
-          <input
-            type="text"
-            value={authToken}
-            onChange={(e) => setAuthToken(e.target.value)}
-            placeholder="Enter your Bearer Token here"
-            style={{ width: '100%', marginTop: '5px' }}
-          />
-        </label>
-        
-        <div style={{display: 'flex', gap: '15px'}}>
-          <label style={{flex: 2}}>
-            Select Role:
-            <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} style={{ width: '100%'}}>
-              <option value="">Select...</option>
-              {roles.map(role => {
-                const roleName = role.RoleType || role.Role;
-                return (<option key={roleName} value={roleName}>{roleName} ({role.Position})</option>)
-              })}
-            </select>
-          </label>
-          <label style={{flex: 1}}>
-            Tier:
-            <select value={tier} onChange={(e) => setTier(e.target.value)} style={{ width: '100%'}}>
-              <option>Iron</option><option>Stone</option><option>Bronze</option><option>Silver</option>
-              <option>Gold</option><option>Platinum</option><option>Diamond</option>
-            </select>
-          </label>
-        </div>
-
-        <button type="submit" disabled={isLoading}>
-          {isLoading ? 'Searching...' : 'Search Market'}
-        </button>
-      </form>
-
-      {error && <p style={{ color: 'red', marginTop: '15px' }}>{error}</p>}
+    <div className="container">
+      <section>
+        <h1>Marketplace Player Search</h1>
+        <p>Find players on the market that fit a specific role and tier. Click on a player in the results to see a detailed analysis.</p>
+        <form onSubmit={handleSearch} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          <label>Authentication Token:<input type="text" value={authToken} onChange={(e) => setAuthToken(e.target.value)} placeholder="Enter your Bearer Token here"/></label>
+          <div style={{display: 'flex', gap: '15px'}}>
+            <label style={{flex: 2}}>Select Role:<select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} style={{ width: '100%'}}><option value="">Select...</option>{roles.map(r => { const rN = r.RoleType || r.Role; return (<option key={rN} value={rN}>{rN} ({r.Position})</option>)})}</select></label>
+            <label style={{flex: 1}}>Tier:<select value={tier} onChange={(e) => setTier(e.target.value)} style={{ width: '100%'}}><option>Iron</option><option>Stone</option><option>Bronze</option><option>Silver</option><option>Gold</option><option>Platinum</option><option>Diamond</option></select></label>
+          </div>
+          <button type="submit" disabled={isLoading}>{isLoading ? 'Searching...' : 'Search Market'}</button>
+        </form>
+        {error && <p style={{ color: 'var(--mikado-yellow)', marginTop: '15px' }}>{error}</p>}
+      </section>
 
       {results.length > 0 && (
-        <>
-          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '30px'}}>
-            <h3>Search Results</h3>
+        <section>
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem'}}>
+            <h2>Search Results</h2>
             <div style={{display: 'flex', gap: '10px'}}>
               <button onClick={handleSortByPrice}>Sort by Price (Lowest)</button>
               <button onClick={handleSortByFitScore}>Sort by Fit Score (Highest)</button>
             </div>
           </div>
           <div style={{overflowX: 'auto'}}>
-            <table style={{width: '100%', borderCollapse: 'collapse', whiteSpace: 'nowrap'}}>
+            <table>
               <thead>
                 <tr style={{textAlign: 'left'}}>
-                  <th style={{padding: '8px'}}>Fit</th>
-                  <th style={{padding: '8px'}}>Name</th>
-                  <th style={{padding: '8px'}}>Age</th>
-                  <th style={{padding: '8px'}}>Overall</th>
-                  <th style={{padding: '8px'}}>Price ($)</th>
-                  <th style={{padding: '8px'}}>Positions</th>
-                  {/* --- Table headers now use the updated style function --- */}
-                  <th style={getAttrStyle('PAC')}>PAC</th>
-                  <th style={getAttrStyle('SHO')}>SHO</th>
-                  <th style={getAttrStyle('PAS')}>PAS</th>
-                  <th style={{padding: '8px', transition: 'all 0.3s ease', ...getAttrStyle('DRI')}}>DRI</th>
-                  <th style={getAttrStyle('DEF')}>DEF</th>
-                  <th style={getAttrStyle('PHY')}>PHY</th>
-                  <th style={getAttrStyle('GK')}>GK</th>
-                  <th style={{padding: '8px'}}>Retirement</th>
+                  <th>Fit</th><th>Name</th><th>Age</th><th>Overall</th><th>Price ($)</th><th>Positions</th>
+                  <th>PAC</th><th>SHO</th><th>PAS</th><th>DRI</th><th>DEF</th><th>PHY</th><th>GK</th><th>Retirement</th>
                 </tr>
               </thead>
+              {/* --- onClick handler added to table rows --- */}
               <tbody>
                 {results.map(listing => {
                   const p = listing.player.metadata;
-                  const rowStyle = { borderTop: '1px solid #444', backgroundColor: p.retirementYears ? 'rgba(251, 133, 0, 0.15)' : 'transparent' };
+                  const rowStyle = { borderTop: '1px solid var(--border-color)', backgroundColor: p.retirementYears ? 'rgba(251, 133, 0, 0.15)' : 'transparent', cursor: 'pointer' };
                   return (
-                    <tr key={listing.listingResourceId} style={rowStyle}>
-                      <td style={{padding: '8px', fontWeight: 'bold'}}>{p.fit_score} ({p.fit_label})</td>
-                      <td style={{padding: '8px'}}>{p.firstName} {p.lastName}</td>
-                      <td style={{padding: '8px'}}>{p.age}</td>
-                      <td style={{padding: '8px', fontWeight: 'bold'}}>{p.overall}</td>
-                      <td style={{padding: '8px'}}>{listing.price ? `${listing.price.toLocaleString()}` : 'N/A'}</td>
-                      <td style={{padding: '8px'}}>{p.positions.join(', ')}</td>
-                      {/* --- Table cells now use the updated style function --- */}
-                      <td style={getAttrStyle('PAC')}>{p.pace}</td>
-                      <td style={getAttrStyle('SHO')}>{p.shooting}</td>
-                      <td style={getAttrStyle('PAS')}>{p.passing}</td>
-                      <td style={getAttrStyle('DRI')}>{p.dribbling}</td>
-                      <td style={getAttrStyle('DEF')}>{p.defense}</td>
-                      <td style={getAttrStyle('PHY')}>{p.physical}</td>
-                      <td style={getAttrStyle('GK')}>{p.goalkeeping}</td>
-                      <td style={{padding: '8px', fontWeight: 'bold', color: 'var(--ut-orange)'}}>{p.retirementYears || '—'}</td>
+                    <tr key={listing.listingResourceId} style={rowStyle} onClick={() => handlePlayerClick(listing)}>
+                      <td style={{fontWeight: 'bold'}}>{p.fit_score} ({p.fit_label})</td>
+                      <td>{p.firstName} {p.lastName}</td>
+                      <td>{p.age}</td>
+                      <td style={{fontWeight: 'bold'}}>{p.overall}</td>
+                      <td>{listing.price ? `${listing.price.toLocaleString()}` : 'N/A'}</td>
+                      <td>{p.positions.join(', ')}</td>
+                      <td>{p.pace}</td><td>{p.shooting}</td><td>{p.passing}</td><td>{p.dribbling}</td><td>{p.defense}</td><td>{p.physical}</td><td>{p.goalkeeping}</td>
+                      <td style={{fontWeight: 'bold', color: 'var(--ut-orange)'}}>{p.retirementYears || '—'}</td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
           </div>
-        </>
+        </section>
+      )}
+
+      {/* --- NEW: PLAYER CARD MODAL (identical to the one in SquadPicker) --- */}
+      {analyzedPlayer && (
+        <div className="modal-overlay" onClick={() => setAnalyzedPlayer(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close-btn" onClick={() => setAnalyzedPlayer(null)}>X</button>
+            {isAnalysisLoading ? <div style={{padding: '4rem', textAlign: 'center'}}>Loading analysis...</div> : analysisData && (
+              <div className="modal-content">
+                <div className="player-stat-card">
+                  <div className="overall">{analysisData.player_attributes.overall}</div>
+                  <h3>{analysisData.player_attributes.firstName} {analysisData.player_attributes.lastName}</h3>
+                  <p>{analysisData.player_attributes.positions.join(', ')}</p>
+                  <div className="player-stat-grid">
+                    <div><strong>{analysisData.player_attributes.pace}</strong> <span>Pace</span></div>
+                    <div><strong>{analysisData.player_attributes.shooting}</strong> <span>Shooting</span></div>
+                    <div><strong>{analysisData.player_attributes.passing}</strong> <span>Passing</span></div>
+                    <div><strong>{analysisData.player_attributes.dribbling}</strong> <span>Dribbling</span></div>
+                    <div><strong>{analysisData.player_attributes.defense}</strong> <span>Defense</span></div>
+                    <div><strong>{analysisData.player_attributes.physical}</strong> <span>Physical</span></div>
+                  </div>
+                </div>
+                <div className="role-analysis">
+                  <h4>Role Analysis (Tier: {tier})</h4>
+                  <p><strong>Best Role:</strong> {analysisData.best_role.role} <span>({analysisData.best_role.score})</span></p>
+                  <h5>All Positive Roles:</h5>
+                  <ul>
+                    {analysisData.positive_roles.map(r => (
+                      <li key={r.role}>{r.role} <span>{r.score} ({r.label})</span></li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

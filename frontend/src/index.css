@@ -1,169 +1,171 @@
 /* file: frontend/src/index.css */
 
-/* --- NEW Color Palette Variables --- */
+/* --- 1. COLOR PALETTE & GLOBAL SETUP --- */
 :root {
   --rich-black: #000814;
   --oxford-blue: #001d3d;
   --yale-blue: #003566;
   --mikado-yellow: #ffc300;
   --gold: #ffd60a;
-  --text-light: #f0f0f0; /* Added a light color for text */
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --border-color: rgba(0, 53, 102, 0.5);
 }
+/* ... (Global Styles, Typography, Navigation, Forms, Tables sections remain the same) ... */
+body { margin: 0; font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif; background-color: var(--rich-black); color: var(--text-primary); min-height: 100vh; }
+#root { max-width: 1280px; margin: 0 auto; padding: 2rem; width: 100%; }
+section { background-color: var(--oxford-blue); border: 1px solid var(--border-color); padding: 1.5rem 2rem; border-radius: 12px; }
+form { border: 1px solid var(--border-color) !important; background-color: transparent !important; }
+h1, h2, h3 { color: var(--mikado-yellow); font-weight: 700; margin-top: 0; }
+h1 { font-size: 3em; line-height: 1.1; text-align: center; margin-bottom: 2rem; }
+h2 { font-size: 1.75em; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1.5rem; }
+p { color: var(--text-secondary); }
+a { color: var(--gold); text-decoration: inherit; font-weight: 500; transition: color 0.2s; }
+a:hover { color: var(--mikado-yellow); }
+nav { display: flex; justify-content: center; gap: 2rem; padding: 1rem 0; border: none !important; border-bottom: 1px solid var(--border-color) !important; }
+nav a { font-size: 1em; padding: 0.5rem 1rem; border-radius: 8px; transition: background-color 0.2s; }
+nav a:hover { background-color: rgba(0, 29, 61, 0.7); }
+button, select, input { border-radius: 8px; border: 1px solid var(--yale-blue); padding: 0.8em 1.2em; font-size: 1em; font-weight: 500; font-family: inherit; background-color: var(--oxford-blue); color: var(--text-primary); cursor: pointer; transition: all 0.2s; }
+button:hover, select:hover, input:hover { border-color: var(--gold); }
+input:focus, select:focus { outline: 2px solid var(--mikado-yellow); outline-offset: 2px; }
+button { background-color: var(--yale-blue); color: var(--gold); font-weight: 700; }
+button:hover { background-color: var(--gold); color: var(--rich-black); }
+select option { background-color: var(--oxford-blue); color: var(--text-primary); }
+label { display: flex; flex-direction: column; gap: 0.5rem; font-weight: 500; color: var(--text-secondary); }
+table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; font-size: 0.9em; }
+thead { background: none; }
+th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border-color); }
+th { font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.8em; letter-spacing: 0.05em; }
+tbody tr { transition: background-color 0.2s; }
+tbody tr:hover { background-color: rgba(0, 29, 61, 0.5); }
 
-/* --- Global Styles --- */
-body {
-  margin: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  background-color: var(--rich-black);
-  color: var(--text-light);
-  min-height: 100vh;
-}
 
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  width: 100%;
-}
-
-/* --- Typography & Links --- */
-h1, h2, h3 {
-  color: var(--gold);
-}
-
-h1 {
-  font-size: 2.5em;
-  line-height: 1.1;
-  text-align: center;
-  margin-bottom: 2rem;
-  color: var(--mikado-yellow);
-}
-
-a {
-  color: var(--gold);
-  text-decoration: none;
-  font-weight: 500;
-  transition: color 0.2s ease-in-out;
-}
-
-a:hover {
-  color: var(--mikado-yellow);
-}
-
-/* --- Navigation --- */
-nav {
-  padding-bottom: 1rem !important;
-  margin-bottom: 2rem !important;
-  border-bottom: 1px solid var(--yale-blue) !important;
-  text-align: center;
-  font-size: 1.1em;
-}
-
-/* --- Forms & Interactive Elements (UPDATED) --- */
-button, select, input {
-  border-radius: 8px;
-  border: 1px solid var(--yale-blue);
-  padding: 0.8em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: var(--oxford-blue);
-  color: var(--text-light);
-  cursor: pointer;
-  transition: border-color 0.25s, background-color 0.25s;
-}
-
-button {
-  background-color: var(--yale-blue);
-  color: var(--mikado-yellow);
-  font-weight: bold;
-}
-
-button:hover {
-  border-color: var(--gold);
-}
-
-button:disabled {
-  background-color: #333;
-  border-color: #555;
-  color: #777;
-  cursor: not-allowed;
-}
-
-label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  font-weight: 500;
-}
-
-/* --- Table Styling --- */
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 1.5rem;
-  font-size: 0.9em;
-}
-
-thead {
-  background-color: var(--oxford-blue);
-}
-
-th, td {
-  padding: 12px 15px;
-  text-align: left;
-  border-bottom: 1px solid var(--yale-blue);
-}
-
-th {
-  font-weight: bold;
-  color: var(--gold);
-}
-
-tbody tr {
-  transition: background-color 0.2s ease-in-out;
-}
-
-tbody tr:hover {
-  background-color: rgba(0, 53, 102, 0.5); /* Semi-transparent Yale Blue */
-}
-
-/* --- Dropdown Options --- */
-select option {
-  background-color: var(--rich-black);
-  color: var(--text-light);
-}
-
-/* --- Player Card Modal --- */
+/* --- 7. PLAYER CARD MODAL (UPDATED & FIXED) --- */
 .modal-overlay {
-  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  background-color: rgba(0, 8, 20, 0.8);
-  display: flex; align-items: center; justify-content: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 8, 20, 0.8); /* --rich-black with transparency */
+  display: flex;
+  align-items: center;
+  justify-content: center;
   z-index: 1000;
+  backdrop-filter: blur(5px);
 }
+
 .modal-card {
   background-color: var(--oxford-blue);
-  padding: 2rem; border-radius: 12px;
+  padding: 0; /* Remove padding to allow content to go edge-to-edge */
+  border-radius: 12px;
   border: 1px solid var(--yale-blue);
-  width: 90%; max-width: 800px;
+  width: 90%;
+  max-width: 850px;
   position: relative;
-  box-shadow: 0 5px 25px rgba(0,0,0,0.5);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  overflow: hidden; /* Hide anything that spills out */
 }
+
 .modal-close-btn {
-  position: absolute; top: 15px; right: 15px;
-  width: 30px; height: 30px;
-  display: flex; align-items: center; justify-content: center;
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
+  z-index: 10;
 }
+
 .modal-content {
-  display: flex; gap: 2rem; margin-top: 1rem;
+  display: flex;
+  flex-direction: row; /* Changed from column to row */
+  gap: 0; /* No gap as columns will touch */
 }
-.player-attributes, .role-analysis {
-  flex: 1;
+
+/* --- NEW: Styles for the redesigned card --- */
+.player-stat-card {
+  flex-basis: 320px;
+  flex-shrink: 0;
+  background: linear-gradient(165deg, var(--yale-blue) 0%, var(--oxford-blue) 100%);
+  padding: 2rem;
+  text-align: center;
 }
+
+.player-stat-card .overall {
+  font-size: 4.5em;
+  font-weight: 900;
+  color: var(--mikado-yellow);
+  line-height: 1;
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+}
+
+.player-stat-card h3 {
+  margin: 0;
+  font-size: 1.8em;
+  color: var(--text-primary);
+}
+
+.player-stat-card p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.player-stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-top: 2rem;
+  text-align: left;
+}
+
+.player-stat-grid div strong {
+  font-size: 1.5em;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.player-stat-grid div span {
+  font-size: 0.9em;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.role-analysis {
+  flex-grow: 1;
+  padding: 2rem;
+  background-color: var(--oxford-blue);
+}
+
+.role-analysis h4 {
+  margin-top: 0;
+  color: var(--gold);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+
 .role-analysis ul {
-  list-style-type: none; padding: 0; max-height: 250px; overflow-y: auto;
+  list-style-type: none;
+  padding: 0;
+  max-height: 300px;
+  overflow-y: auto;
 }
+
 .role-analysis li {
-  padding: 4px 0;
+  padding: 6px 0;
+  display: flex;
+  justify-content: space-between;
+}
+
+.role-analysis li span {
+  background-color: rgba(0, 53, 102, 0.5); /* Semi-transparent Yale Blue */
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
 }
