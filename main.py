@@ -11,7 +11,7 @@ from typing import Dict, List
 # -----------------------------
 # Config
 # -----------------------------
-ROLES_PATH = "roles.json"   # your Roles.json file
+ROLES_PATH = "roles.json"
 OWNER_WALLET = "0x5d4143c95673cba6"
 PLAYERS_API = (
     f"https://z519wdyajg.execute-api.us-east-1.amazonaws.com/prod/players"
@@ -79,7 +79,6 @@ class MarketSearchRequest(BaseModel):
 # Data Fetch & Scoring
 # -----------------------------
 def fetch_players() -> pd.DataFrame:
-    # This function remains the same as you provided
     r = requests.get(PLAYERS_API, timeout=30)
     players = []
     if r.ok:
@@ -93,7 +92,6 @@ def fetch_players() -> pd.DataFrame:
     return pd.DataFrame(players)
 
 def calc_fit(player: pd.Series, role_name: str, tier: str):
-    # This function remains the same as you provided
     role_key = (role_name or "").strip().upper()
     role = ROLE_LOOKUP.get(role_key)
     if not role: return -999, "Unknown"
@@ -132,7 +130,6 @@ def get_roles():
 
 @app.post("/squad/assign")
 def assign_squad(req: AssignSquadRequest):
-    # This endpoint remains the same as you provided
     players_df = fetch_players()
     all_options = []
     for slot, role_name in req.role_map.items():
@@ -141,9 +138,7 @@ def assign_squad(req: AssignSquadRequest):
             if label == "Unusable": continue
             all_options.append({ "score": score, "label": label, "player": pl.to_dict(), "slot": slot, "role_name": role_name })
     all_options.sort(key=lambda x: x["score"], reverse=True)
-    used_player_ids = set()
-    filled_slots = set()
-    final_assignments = {}
+    used_player_ids, filled_slots, final_assignments = set(), set(), {}
     for option in all_options:
         player_id = option["player"]["id"]
         slot = option["slot"]
@@ -161,19 +156,40 @@ def assign_squad(req: AssignSquadRequest):
 
 @app.post("/market/search")
 def search_market(req: MarketSearchRequest):
-    # This endpoint remains the same as you provided
     role_key = (req.role_name or "").strip().upper()
     role = ROLE_LOOKUP.get(role_key)
-    if not role: raise HTTPException(status_code=404, detail="Role not found")
+
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+
+    # --- THIS IS THE UPDATED SECTION ---
     thresholds = TIER_THRESH["Iron"]
-    params = { "limit": 25, "type": "PLAYER", "status": "AVAILABLE", "view": "full" }
+    
+    # Base parameters for the marketplace API
+    params = {
+        "limit": 25,
+        "type": "PLAYER",
+        "status": "AVAILABLE",
+        "view": "full"
+    }
+
+    # Get the position required by the role
+    required_position = role.get("Position")
+    if required_position:
+        params["positions"] = required_position # Add position to the search parameters
+
+    # Add minimum attribute values based on the role's attributes
     for i, attr_field in enumerate(["Attribute1", "Attribute2", "Attribute3", "Attribute4"]):
         code = (role.get(attr_field) or "").strip().upper()
         if not code: continue
+        
         player_attr_col = ATTR_MAP.get(code)
         if not player_attr_col: continue
+        
         params[f"{player_attr_col}Min"] = thresholds[i]
+    
     headers = { "Authorization": f"Bearer {req.auth_token}" }
+
     try:
         r = requests.get(MARKETPLACE_API, headers=headers, params=params, timeout=30)
         r.raise_for_status()
