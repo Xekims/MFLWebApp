@@ -21,31 +21,29 @@ FORMATION_MAPS = {
     "3-5-2": { "GK": "GK-Sweeper", "CB1": "CB-Wide", "CB2": "CB-Central", "CB3": "CB-Wide", "CDM": "CDM-Anchor", "CM1": "CM-Creator", "CM2": "CM-Carrier", "LM": "LM-Wingbacks", "RM": "RM-Wingbacks", "ST1": "ST-Deep", "ST2": "ST-Advanced" },
 }
 
-# --- Utilities & App Init (no changes here) ---
-POS_ALIAS = { "LWB": "LB", "RWB": "RB", "LW": "LM", "RW": "RM", "CB-L": "CB", "CB-R": "CB", "CBL": "CB", "CBR": "CB" }
-def norm_pos(s: str) -> str:
-    s = (s or "").strip().upper()
-    return POS_ALIAS.get(s, s)
+# --- Utilities / Normalization ---
+# --- DELETED POS_ALIAS and norm_pos FUNCTION ---
 def get_role_name_key(r: dict) -> str:
     return (r.get("Role") or r.get("RoleType") or "").strip().upper()
+
+# --- Load roles & Init App (no changes here) ---
 with open(ROLES_PATH, "r", encoding="utf-8") as f:
     ROLES_DATA: List[dict] = json.load(f)
 ROLE_LOOKUP = {get_role_name_key(r): r for r in ROLES_DATA}
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# --- Pydantic Models ---
+# --- Pydantic Models (no changes here) ---
 class AssignSquadRequest(BaseModel):
     formation_name: str
     role_map: Dict[str, str]
     tier: str = "Iron"
-
 class MarketSearchRequest(BaseModel):
     role_name: str
     auth_token: str
-    tier: str = "Iron" # Added tier to the request
+    tier: str = "Iron"
 
-# --- Data Fetch & Scoring (no changes here) ---
+# --- Data Fetch & Scoring ---
 def fetch_players() -> pd.DataFrame:
     r = requests.get(PLAYERS_API, timeout=30)
     players = []
@@ -55,7 +53,8 @@ def fetch_players() -> pd.DataFrame:
         for p in data_list:
             m = p.get("metadata", {})
             positions_raw = m.get("positions", [])
-            positions_norm = [norm_pos(pos) for pos in positions_raw]
+            # --- UPDATED: Simplified normalization ---
+            positions_norm = [(pos or "").strip().upper() for pos in positions_raw]
             players.append({ "id": p.get("id"), "firstName": m.get("firstName", ""), "lastName": m.get("lastName", ""), "positions": positions_norm, "overall": m.get("overall", 0), "pace": m.get("pace", 0), "shooting": m.get("shooting", 0), "passing": m.get("passing", 0), "dribbling": m.get("dribbling", 0), "defense": m.get("defense", 0), "physical": m.get("physical", 0), "goalkeeping": m.get("goalkeeping", 0) })
     return pd.DataFrame(players)
 
@@ -64,9 +63,13 @@ def calc_fit(player: pd.Series, role_name: str, tier: str):
     role = ROLE_LOOKUP.get(role_key)
     if not role: return -999, "Unknown"
     thresholds = TIER_THRESH.get(tier, TIER_THRESH["Iron"])
-    need_pos = norm_pos(role.get("Position", ""))
-    player_pos = {norm_pos(p) for p in (player.get("positions") or [])}
+    
+    # --- UPDATED: Simplified normalization ---
+    need_pos = (role.get("Position", "") or "").strip().upper()
+    player_pos = {(p or "").strip().upper() for p in (player.get("positions") or [])}
+
     if need_pos not in player_pos: return -999, "Unusable"
+    
     score = 0
     for i, attr_field in enumerate(["Attribute1", "Attribute2", "Attribute3", "Attribute4"]):
         code = (role.get(attr_field) or "").strip().upper()
@@ -75,21 +78,24 @@ def calc_fit(player: pd.Series, role_name: str, tier: str):
         if not player_attr_col: continue
         val = player.get(player_attr_col, 0) or 0
         score += (val - thresholds[i]) * ATTRIBUTE_WEIGHTS[i]
+    
     label = ( "Elite" if score >= 50 else "Strong" if score >= 20 else "Natural" if score >= 0  else "Weak" if score >= -20 else "Unusable" )
     return int(score), label
 
-# --- Endpoints ---
+# --- Endpoints (no other changes from here down) ---
+# ... (rest of your endpoints remain the same) ...
 @app.get("/formations")
-def get_formations():
-    return {"formations": list(FORMATION_MAPS.keys())}
+def get_formations(): return {"formations": list(FORMATION_MAPS.keys())}
+
 @app.get("/formation/{formation_name}")
 def get_formation(formation_name: str):
     fm = FORMATION_MAPS.get(formation_name)
     if not fm: raise HTTPException(status_code=404, detail="Formation not found")
     return fm
+
 @app.get("/roles")
-def get_roles():
-    return ROLES_DATA
+def get_roles(): return ROLES_DATA
+
 @app.post("/squad/assign")
 def assign_squad(req: AssignSquadRequest):
     players_df = fetch_players()
@@ -114,20 +120,32 @@ def assign_squad(req: AssignSquadRequest):
         else: squad_rows.append({ "slot": slot, "position": ROLE_LOOKUP.get((role_name or "").strip().upper(), {}).get("Position", ""), "assigned_role": role_name, "player_name": "", "player_id": "", "fit_score": "", "fit_label": "Unfilled" })
     return {"squad": squad_rows}
 
-# --- UPDATED /market/search ENDPOINT ---
+@app.get("/player/{player_id}/analysis")
+def get_player_analysis(player_id: int, tier: str = "Iron"):
+    players_df = fetch_players()
+    player_row = players_df.loc[players_df["id"] == player_id]
+    if player_row.empty:
+        raise HTTPException(status_code=404, detail="Player not found")
+    player_series = player_row.iloc[0]
+    all_role_scores = []
+    for role_data in ROLES_DATA:
+        role_name = get_role_name_key(role_data)
+        score, label = calc_fit(player_series, role_name, tier)
+        if label != "Unusable":
+            all_role_scores.append({ "role": role_name, "score": score, "label": label })
+    all_role_scores.sort(key=lambda x: x["score"], reverse=True)
+    positive_roles = [r for r in all_role_scores if r["score"] >= 0]
+    best_role = all_role_scores[0] if all_role_scores else None
+    return { "player_attributes": player_series.to_dict(), "best_role": best_role, "positive_roles": positive_roles }
+
 @app.post("/market/search")
 def search_market(req: MarketSearchRequest):
     role_key = (req.role_name or "").strip().upper()
     role = ROLE_LOOKUP.get(role_key)
-
-    if not role:
-        raise HTTPException(status_code=404, detail="Role not found")
-
-    params = {"limit": 50, "type": "PLAYER", "status": "AVAILABLE", "view": "full"}
+    if not role: raise HTTPException(status_code=404, detail="Role not found")
+    params = {"limit": 25, "type": "PLAYER", "status": "AVAILABLE", "view": "full"}
     required_position = role.get("Position")
-    if required_position:
-        params["positions"] = required_position
-
+    if required_position: params["positions"] = required_position
     thresholds = TIER_THRESH["Iron"]
     for i, attr_field in enumerate(["Attribute1", "Attribute2", "Attribute3", "Attribute4"]):
         code = (role.get(attr_field) or "").strip().upper()
@@ -135,29 +153,18 @@ def search_market(req: MarketSearchRequest):
         player_attr_col = ATTR_MAP.get(code)
         if not player_attr_col: continue
         params[f"{player_attr_col}Min"] = thresholds[i]
-    
     headers = {"Authorization": f"Bearer {req.auth_token}"}
-
     try:
         r = requests.get(MARKETPLACE_API, headers=headers, params=params, timeout=30)
         r.raise_for_status()
         listings = r.json()
-
-        # --- NEW: Calculate fit score for each player ---
         for listing in listings:
             player_data = listing.get("player", {}).get("metadata", {})
-            
-            # The calc_fit function expects a Pandas Series, so we create one
             player_series = pd.Series(player_data)
-            
             score, label = calc_fit(player_series, req.role_name, req.tier)
-            
-            # Add the score and label to the player's metadata
             listing["player"]["metadata"]["fit_score"] = score
             listing["player"]["metadata"]["fit_label"] = label
-        
         return listings
-
     except requests.exceptions.HTTPError as e:
         raise HTTPException(status_code=e.response.status_code, detail=e.response.json())
     except requests.exceptions.RequestException as e:

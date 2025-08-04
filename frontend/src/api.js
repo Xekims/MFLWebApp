@@ -44,3 +44,11 @@ export async function fetchFormationMap(formationName) {
   }
   return res.json();
 }
+
+export async function fetchPlayerAnalysis(playerId, tier) {
+  const res = await fetch(`${API_URL}/player/${playerId}/analysis?tier=${tier}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch player analysis: ${res.status}`);
+  }
+  return res.json();
+}
