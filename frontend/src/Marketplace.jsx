@@ -13,23 +13,20 @@ export default function Marketplace() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // --- NEW: States for the player card modal ---
   const [analyzedPlayer, setAnalyzedPlayer] = useState(null);
   const [analysisData, setAnalysisData] = useState(null);
   const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
 
-  // --- All existing functions (useEffect, handlers, etc.) remain the same ---
   useEffect(() => { (async () => { try { const r = await api.fetchRoles(); setRoles(r); } catch (err) { console.error('Could not load roles.', err); setError('Could not load roles.'); }})(); }, []);
   useEffect(() => { if (selectedRole && roles.length > 0) { const d = roles.find(r => (r.Role || r.RoleType) === selectedRole); setCurrentRoleDetails(d); } else { setCurrentRoleDetails(null); }}, [selectedRole, roles]);
   const handleSearch = async (e) => { e.preventDefault(); if (!selectedRole || !authToken) { setError('Please select a role and provide an auth token.'); return; } setIsLoading(true); setError(''); setResults([]); try { const data = await api.searchMarketplace({ role_name: selectedRole, auth_token: authToken, tier: tier }); setResults(data ?? []); } catch (err) { setError('Search failed. Check the token or console for details.'); console.error(err); } finally { setIsLoading(false); }};
   const handleSortByPrice = () => { const sorted = [...results].sort((a, b) => a.price - b.price); setResults(sorted); };
   const handleSortByFitScore = () => { const sorted = [...results].sort((a, b) => b.player.metadata.fit_score - a.player.metadata.fit_score); setResults(sorted); };
   
-  // --- NEW: Function to handle clicking a player in the results ---
   const handlePlayerClick = async (playerListing) => {
     if (!playerListing.player?.id) return;
     setIsAnalysisLoading(true);
-    setAnalyzedPlayer(playerListing.player); // Store the whole player object
+    setAnalyzedPlayer(playerListing.player);
     setAnalysisData(null);
     try {
       const data = await api.fetchPlayerAnalysis(playerListing.player.id, tier);
@@ -41,7 +38,11 @@ export default function Marketplace() {
     }
   };
 
-  const getAttrStyle = (attrCode) => { /* ... (This function remains the same) ... */ };
+  const getAttrStyle = (attrCode) => {
+    // This function is no longer used in Marketplace.jsx but kept for reference
+    // if you decide to re-implement attribute highlighting here.
+    return { padding: '8px' };
+  };
 
   return (
     <div className="container">
@@ -76,7 +77,6 @@ export default function Marketplace() {
                   <th>PAC</th><th>SHO</th><th>PAS</th><th>DRI</th><th>DEF</th><th>PHY</th><th>GK</th><th>Retirement</th>
                 </tr>
               </thead>
-              {/* --- onClick handler added to table rows --- */}
               <tbody>
                 {results.map(listing => {
                   const p = listing.player.metadata;
@@ -100,7 +100,6 @@ export default function Marketplace() {
         </section>
       )}
 
-      {/* --- NEW: PLAYER CARD MODAL (identical to the one in SquadPicker) --- */}
       {analyzedPlayer && (
         <div className="modal-overlay" onClick={() => setAnalyzedPlayer(null)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
