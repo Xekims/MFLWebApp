@@ -1,21 +1,21 @@
 /* file: frontend/src/index.css */
 
-/* --- Color Palette Variables --- */
+/* --- NEW Color Palette Variables --- */
 :root {
-  --prussian-blue: #023047;
-  --sky-blue: #8ecae6;
-  --blue-green: #219ebc;
-  --selective-yellow: #ffb703;
-  --ut-orange: #fb8500;
-  --white: #ffffff;
+  --rich-black: #000814;
+  --oxford-blue: #001d3d;
+  --yale-blue: #003566;
+  --mikado-yellow: #ffc300;
+  --gold: #ffd60a;
+  --text-light: #f0f0f0; /* Added a light color for text */
 }
 
 /* --- Global Styles --- */
 body {
   margin: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  background-color: var(--prussian-blue);
-  color: var(--sky-blue);
+  background-color: var(--rich-black);
+  color: var(--text-light);
   min-height: 100vh;
 }
 
@@ -27,9 +27,8 @@ body {
 }
 
 /* --- Typography & Links --- */
-h1, h3 {
-  color: var(--selective-yellow);
-  margin-bottom: 1.5rem;
+h1, h2, h3 {
+  color: var(--gold);
 }
 
 h1 {
@@ -37,55 +36,57 @@ h1 {
   line-height: 1.1;
   text-align: center;
   margin-bottom: 2rem;
+  color: var(--mikado-yellow);
 }
 
 a {
-  color: var(--blue-green);
+  color: var(--gold);
   text-decoration: none;
   font-weight: 500;
   transition: color 0.2s ease-in-out;
 }
 
 a:hover {
-  color: var(--ut-orange);
+  color: var(--mikado-yellow);
 }
 
 /* --- Navigation --- */
 nav {
   padding-bottom: 1rem !important;
   margin-bottom: 2rem !important;
-  border-bottom: 1px solid var(--blue-green) !important;
+  border-bottom: 1px solid var(--yale-blue) !important;
   text-align: center;
   font-size: 1.1em;
 }
 
-/* --- Forms & Interactive Elements --- */
-button, select, input[type="text"] {
+/* --- Forms & Interactive Elements (UPDATED) --- */
+button, select, input {
   border-radius: 8px;
-  border: 1px solid transparent;
+  border: 1px solid var(--yale-blue);
   padding: 0.8em 1.2em;
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: rgba(33, 158, 188, 0.2); /* Transparent Blue Green */
-  color: var(--sky-blue);
+  background-color: var(--oxford-blue);
+  color: var(--text-light);
   cursor: pointer;
   transition: border-color 0.25s, background-color 0.25s;
 }
 
 button {
-  background-color: var(--blue-green);
-  color: var(--prussian-blue);
+  background-color: var(--yale-blue);
+  color: var(--mikado-yellow);
   font-weight: bold;
 }
 
 button:hover {
-  background-color: var(--ut-orange);
+  border-color: var(--gold);
 }
 
 button:disabled {
-  background-color: #555;
-  color: #999;
+  background-color: #333;
+  border-color: #555;
+  color: #777;
   cursor: not-allowed;
 }
 
@@ -105,18 +106,18 @@ table {
 }
 
 thead {
-  background-color: rgba(33, 158, 188, 0.3); /* Transparent Blue Green */
+  background-color: var(--oxford-blue);
 }
 
 th, td {
   padding: 12px 15px;
   text-align: left;
-  border-bottom: 1px solid var(--blue-green);
+  border-bottom: 1px solid var(--yale-blue);
 }
 
 th {
   font-weight: bold;
-  color: var(--selective-yellow);
+  color: var(--gold);
 }
 
 tbody tr {
@@ -124,68 +125,45 @@ tbody tr {
 }
 
 tbody tr:hover {
-  background-color: rgba(255, 183, 3, 0.1); /* Transparent Yellow on hover */
+  background-color: rgba(0, 53, 102, 0.5); /* Semi-transparent Yale Blue */
 }
 
-/* --- NEW STYLE FOR DROPDOWN OPTIONS --- */
+/* --- Dropdown Options --- */
 select option {
-  background-color: var(--prussian-blue);
-  color: var(--sky-blue);
+  background-color: var(--rich-black);
+  color: var(--text-light);
 }
 
+/* --- Player Card Modal --- */
 .modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(0, 8, 20, 0.8);
+  display: flex; align-items: center; justify-content: center;
   z-index: 1000;
 }
-
 .modal-card {
-  background-color: var(--prussian-blue);
-  padding: 2rem;
-  border-radius: 12px;
-  border: 1px solid var(--blue-green);
-  width: 90%;
-  max-width: 800px;
+  background-color: var(--oxford-blue);
+  padding: 2rem; border-radius: 12px;
+  border: 1px solid var(--yale-blue);
+  width: 90%; max-width: 800px;
   position: relative;
   box-shadow: 0 5px 25px rgba(0,0,0,0.5);
 }
-
 .modal-close-btn {
-  position: absolute;
-  top: 15px;
-  right: 15px;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  position: absolute; top: 15px; right: 15px;
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
   padding: 0;
 }
-
 .modal-content {
-  display: flex;
-  gap: 2rem;
-  margin-top: 1rem;
+  display: flex; gap: 2rem; margin-top: 1rem;
 }
-
 .player-attributes, .role-analysis {
   flex: 1;
 }
-
 .role-analysis ul {
-  list-style-type: none;
-  padding: 0;
-  max-height: 250px;
-  overflow-y: auto;
+  list-style-type: none; padding: 0; max-height: 250px; overflow-y: auto;
 }
-
 .role-analysis li {
   padding: 4px 0;
 }

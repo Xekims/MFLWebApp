@@ -1,0 +1,41 @@
+{
+    "4-2-3-1": {
+        "GK": "GK-Sweeper",
+        "LB": "LB-Overlapper",
+        "RB": "RB-Recovery",
+        "CB1": "CB-Mobile",
+        "CB2": "CB-Destroyer",
+        "CDM1": "CDM-Holding",
+        "CDM2": "CDM-Volante",
+        "LM": "LM-Creative",
+        "RM": "RM-Direct",
+        "CAM": "CAM-Playmaker",
+        "ST": "ST-Complete"
+    },
+    "3-5-2": {
+        "GK": "GK-Sweeper",
+        "CB1": "CB-Wide",
+        "CB2": "CB-Central",
+        "CB3": "CB-Wide",
+        "CDM": "CDM-Anchor",
+        "CM1": "CM-Creator",
+        "CM2": "CM-Carrier",
+        "LM": "LM-Wingbacks",
+        "RM": "RM-Wingbacks",
+        "ST1": "ST-Deep",
+        "ST2": "ST-Advanced"
+    },
+    "4-4-2": {
+        "GK": "GK-Sweeper",
+        "LB": "LB-Overlapper",
+        "RB": "RB-Recovery",
+        "CB1": "CB-Mobile",
+        "CB2": "CB-Destroyer",
+        "LM": "LM-Creative",
+        "RM": "RM-Direct",
+        "CM1": "CM-Defensive",
+        "CM2": "CM-Creator",
+        "ST1": "ST-Deep",
+        "ST2": "ST-Advanced"
+    }
+}
