@@ -1,68 +1,134 @@
+/* file: frontend/src/index.css */
+
+/* --- Color Palette Variables --- */
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --prussian-blue: #023047;
+  --sky-blue: #8ecae6;
+  --blue-green: #219ebc;
+  --selective-yellow: #ffb703;
+  --ut-orange: #fb8500;
+  --white: #ffffff;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
+/* --- Global Styles --- */
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  background-color: var(--prussian-blue);
+  color: var(--sky-blue);
   min-height: 100vh;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  width: 100%;
 }
 
-button {
+/* --- Typography & Links --- */
+h1, h3 {
+  color: var(--selective-yellow);
+  margin-bottom: 1.5rem;
+}
+
+h1 {
+  font-size: 2.5em;
+  line-height: 1.1;
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+a {
+  color: var(--blue-green);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s ease-in-out;
+}
+
+a:hover {
+  color: var(--ut-orange);
+}
+
+/* --- Navigation --- */
+nav {
+  padding-bottom: 1rem !important;
+  margin-bottom: 2rem !important;
+  border-bottom: 1px solid var(--blue-green) !important;
+  text-align: center;
+  font-size: 1.1em;
+}
+
+/* --- Forms & Interactive Elements --- */
+button, select, input[type="text"] {
   border-radius: 8px;
   border: 1px solid transparent;
-  padding: 0.6em 1.2em;
+  padding: 0.8em 1.2em;
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: rgba(33, 158, 188, 0.2); /* Transparent Blue Green */
+  color: var(--sky-blue);
   cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  transition: border-color 0.25s, background-color 0.25s;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+button {
+  background-color: var(--blue-green);
+  color: var(--prussian-blue);
+  font-weight: bold;
+}
+
+button:hover {
+  background-color: var(--ut-orange);
+}
+
+button:disabled {
+  background-color: #555;
+  color: #999;
+  cursor: not-allowed;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+
+/* --- Table Styling --- */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1.5rem;
+  font-size: 0.9em;
+}
+
+thead {
+  background-color: rgba(33, 158, 188, 0.3); /* Transparent Blue Green */
+}
+
+th, td {
+  padding: 12px 15px;
+  text-align: left;
+  border-bottom: 1px solid var(--blue-green);
+}
+
+th {
+  font-weight: bold;
+  color: var(--selective-yellow);
+}
+
+tbody tr {
+  transition: background-color 0.2s ease-in-out;
+}
+
+tbody tr:hover {
+  background-color: rgba(255, 183, 3, 0.1); /* Transparent Yellow on hover */
+}
+
+/* --- NEW STYLE FOR DROPDOWN OPTIONS --- */
+select option {
+  background-color: var(--prussian-blue);
+  color: var(--sky-blue);
 }
