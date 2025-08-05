@@ -3,18 +3,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import * as api from './api';
 
-// --- NEW: A helper map and default order for our dynamic columns ---
 const attributeMap = {
-  PAC: { label: 'PAC', key: 'pace' },
-  SHO: { label: 'SHO', key: 'shooting' },
-  PAS: { label: 'PAS', key: 'passing' },
-  DRI: { label: 'DRI', key: 'dribbling' },
-  DEF: { label: 'DEF', key: 'defense' },
-  PHY: { label: 'PHY', key: 'physical' },
+  PAC: { label: 'PAC', key: 'pace' }, SHO: { label: 'SHO', key: 'shooting' }, PAS: { label: 'PAS', key: 'passing' },
+  DRI: { label: 'DRI', key: 'dribbling' }, DEF: { label: 'DEF', key: 'defense' }, PHY: { label: 'PHY', key: 'physical' },
   GK:  { label: 'GK', key: 'goalkeeping' },
 };
 const defaultAttributeOrder = ['PAC', 'SHO', 'PAS', 'DRI', 'DEF', 'PHY', 'GK'];
-
 
 export default function Marketplace() {
   const [roles, setRoles] = useState([]);
@@ -25,15 +19,15 @@ export default function Marketplace() {
   const [results, setResults] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  
   const [analyzedPlayer, setAnalyzedPlayer] = useState(null);
   const [analysisData, setAnalysisData] = useState(null);
   const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
-  
-  // --- NEW: State to hold the dynamic order of attribute columns ---
+  const [analysisError, setAnalysisError] = useState(''); // State for modal errors
+
   const [attributeOrder, setAttributeOrder] = useState(defaultAttributeOrder);
 
   useEffect(() => {
-    // Fetches initial roles data
     (async () => {
       try {
         const rolesData = await api.fetchRoles();
@@ -45,13 +39,10 @@ export default function Marketplace() {
     })();
   }, []);
 
-  // --- UPDATED: This effect now also sets the column order ---
   useEffect(() => {
     if (selectedRole && roles.length > 0) {
       const details = roles.find(r => (r.Role || r.RoleType) === selectedRole);
       setCurrentRoleDetails(details);
-
-      // Set the new dynamic column order
       if (details) {
         const keyAttributes = [details.Attribute1, details.Attribute2, details.Attribute3, details.Attribute4].filter(Boolean);
         const otherAttributes = defaultAttributeOrder.filter(attr => !keyAttributes.includes(attr));
@@ -75,11 +66,7 @@ export default function Marketplace() {
     setError('');
     setResults([]);
     try {
-      const data = await api.searchMarketplace({
-        role_name: selectedRole,
-        auth_token: authToken,
-        tier: tier
-      });
+      const data = await api.searchMarketplace({ role_name: selectedRole, auth_token: authToken, tier: tier });
       setResults(data ?? []);
     } catch (err) {
       setError('Search failed. Check the token or console for details.');
@@ -89,19 +76,13 @@ export default function Marketplace() {
     }
   };
 
-  const handleSortByPrice = () => {
-    const sorted = [...results].sort((a, b) => a.price - b.price);
-    setResults(sorted);
-  };
-
-  const handleSortByFitScore = () => {
-    const sorted = [...results].sort((a, b) => b.player.metadata.fit_score - a.player.metadata.fit_score);
-    setResults(sorted);
-  };
+  const handleSortByPrice = () => setResults([...results].sort((a, b) => a.price - b.price));
+  const handleSortByFitScore = () => setResults([...results].sort((a, b) => b.player.metadata.fit_score - a.player.metadata.fit_score));
 
   const handlePlayerClick = async (playerListing) => {
     if (!playerListing.player?.id) return;
     setIsAnalysisLoading(true);
+    setAnalysisError('');
     setAnalyzedPlayer(playerListing.player);
     setAnalysisData(null);
     try {
@@ -109,6 +90,7 @@ export default function Marketplace() {
       setAnalysisData(data);
     } catch (err) {
       console.error("Player analysis failed:", err);
+      setAnalysisError("Could not load player analysis. The player may no longer be available.");
     } finally {
       setIsAnalysisLoading(false);
     }
@@ -116,18 +98,9 @@ export default function Marketplace() {
 
   const getAttrStyle = (attrCode) => {
     const baseStyle = { padding: '8px', transition: 'background-color 0.3s ease' };
-    if (!currentRoleDetails || !attrCode) {
-      return baseStyle;
-    }
-    const keyAttributes = [
-      currentRoleDetails.Attribute1,
-      currentRoleDetails.Attribute2,
-      currentRoleDetails.Attribute3,
-      currentRoleDetails.Attribute4
-    ];
-    if (keyAttributes.includes(attrCode)) {
-      return { ...baseStyle, backgroundColor: 'rgba(255, 214, 10, 0.1)' };
-    }
+    if (!currentRoleDetails || !attrCode) return baseStyle;
+    const keyAttributes = [currentRoleDetails.Attribute1, currentRoleDetails.Attribute2, currentRoleDetails.Attribute3, currentRoleDetails.Attribute4];
+    if (keyAttributes.includes(attrCode)) return { ...baseStyle, backgroundColor: 'rgba(255, 214, 10, 0.1)' };
     return baseStyle;
   };
 
@@ -158,13 +131,10 @@ export default function Marketplace() {
           </div>
           <div style={{overflowX: 'auto'}}>
             <table>
-              {/* --- UPDATED: Table headers are now dynamically rendered --- */}
               <thead>
                 <tr style={{textAlign: 'left'}}>
                   <th>Fit</th><th>Name</th><th>Age</th><th>Overall</th><th>Price ($)</th><th>Positions</th>
-                  {attributeOrder.map(attrCode => (
-                    <th key={attrCode} style={getAttrStyle(attrCode)}>{attributeMap[attrCode].label}</th>
-                  ))}
+                  {attributeOrder.map(attrCode => (<th key={attrCode} style={getAttrStyle(attrCode)}>{attributeMap[attrCode].label}</th>))}
                   <th>Retirement</th>
                 </tr>
               </thead>
@@ -180,10 +150,7 @@ export default function Marketplace() {
                       <td style={{fontWeight: 'bold'}}>{p.overall}</td>
                       <td>{listing.price ? `${listing.price.toLocaleString()}` : 'N/A'}</td>
                       <td>{p.positions.join(', ')}</td>
-                      {/* --- UPDATED: Table cells are now dynamically rendered --- */}
-                      {attributeOrder.map(attrCode => (
-                        <td key={attrCode} style={getAttrStyle(attrCode)}>{p[attributeMap[attrCode].key]}</td>
-                      ))}
+                      {attributeOrder.map(attrCode => (<td key={attrCode} style={getAttrStyle(attrCode)}>{p[attributeMap[attrCode].key]}</td>))}
                       <td style={{fontWeight: 'bold', color: 'var(--ut-orange)'}}>{p.retirementYears || '—'}</td>
                     </tr>
                   )
@@ -194,8 +161,46 @@ export default function Marketplace() {
         </section>
       )}
 
-      {/* ... (Modal code remains unchanged) ... */}
-      {analyzedPlayer && ( <div className="modal-overlay" onClick={() => setAnalyzedPlayer(null)}>...</div> )}
+      {/* --- CORRECTED MODAL LOGIC --- */}
+      {analyzedPlayer && (
+        <div className="modal-overlay" onClick={() => setAnalyzedPlayer(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close-btn" onClick={() => setAnalyzedPlayer(null)}>X</button>
+            
+            {isAnalysisLoading && <div style={{padding: '4rem', textAlign: 'center'}}>Loading analysis...</div>}
+            
+            {analysisError && <div style={{padding: '4rem', textAlign: 'center', color: 'var(--mikado-yellow)'}}>{analysisError}</div>}
+
+            {!isAnalysisLoading && !analysisError && analysisData && (
+              <div className="modal-content">
+                <div className="player-stat-card">
+                  <div className="overall">{analysisData.player_attributes.overall}</div>
+                  <h3>{analysisData.player_attributes.firstName} {analysisData.player_attributes.lastName}</h3>
+                  <p>Age: {analysisData.player_attributes.age} &nbsp;&bull;&nbsp; {analysisData.player_attributes.positions.join(', ')}</p>
+                  <div className="player-stat-grid">
+                    <div><strong>{analysisData.player_attributes.pace}</strong> <span>Pace</span></div>
+                    <div><strong>{analysisData.player_attributes.shooting}</strong> <span>Shooting</span></div>
+                    <div><strong>{analysisData.player_attributes.passing}</strong> <span>Passing</span></div>
+                    <div><strong>{analysisData.player_attributes.dribbling}</strong> <span>Dribbling</span></div>
+                    <div><strong>{analysisData.player_attributes.defense}</strong> <span>Defense</span></div>
+                    <div><strong>{analysisData.player_attributes.physical}</strong> <span>Physical</span></div>
+                  </div>
+                </div>
+                <div className="role-analysis">
+                  <h4>Role Analysis (Tier: {tier})</h4>
+                  <p><strong>Best Role:</strong> {analysisData.best_role.role} <span>({analysisData.best_role.score})</span></p>
+                  <h5>All Positive Roles:</h5>
+                  <ul>
+                    {analysisData.positive_roles.map(r => (
+                      <li key={r.role}>{r.role} <span>{r.score} ({r.label})</span></li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
