@@ -15,13 +15,12 @@ OWNER_WALLET = "0x5d4143c95673cba6"
 PLAYERS_API_BASE = "https://z519wdyajg.execute-api.us-east-1.amazonaws.com/prod/players"
 PLAYERS_API_OWNED = (f"{PLAYERS_API_BASE}?limit=1500&ownerWalletAddress={OWNER_WALLET}")
 MARKETPLACE_API = "https://z519wdyajg.execute-api.us-east-1.amazonaws.com/prod/listings"
-# NEW: The correct endpoint for fetching single player data
 EVENTS_API_BASE = "https://z519wdyajg.execute-api.us-east-1.amazonaws.com/prod/events"
 TIER_THRESH = {'Diamond':[97,93,90,87], 'Platinum':[93,90,87,84], 'Gold':[90,87,84,80], 'Silver':[87,84,80,77], 'Bronze':[84,80,77,74], 'Iron':[80,77,74,70], 'Stone':[77,74,70,66], 'Ice':[74,70,66,61], 'Spark':[70,66,61,57], 'Flint':[66,61,57,52]}
 ATTRIBUTE_WEIGHTS = [4, 3, 2, 1]
 ATTR_MAP = {"PAC": "pace", "SHO": "shooting", "PAS": "passing", "DRI": "dribbling", "DEF": "defense", "PHY": "physical", "GK": "goalkeeping"}
 
-# --- Data Loading & App Init ---
+# --- Data Loading & App Init (no changes) ---
 def load_roles():
     with open(ROLES_PATH, "r", encoding="utf-8") as f: return json.load(f)
 def load_formations():
@@ -32,7 +31,7 @@ ROLE_LOOKUP = {(r.get("Role") or r.get("RoleType") or "").strip().upper(): r for
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# --- Helper functions to save data ---
+# --- Helper functions to save data (no changes) ---
 def save_roles(data: List[Dict]):
     global ROLES_DATA, ROLE_LOOKUP
     with open(ROLES_PATH, "w", encoding="utf-8") as f: json.dump(data, f, indent=2)
@@ -42,7 +41,7 @@ def save_formations(data: Dict):
     with open(FORMATIONS_PATH, "w", encoding="utf-8") as f: json.dump(data, f, indent=4)
     FORMATION_MAPS = data
 
-# --- Pydantic Models ---
+# --- Pydantic Models (no changes) ---
 class Role(BaseModel): Role: str; Attribute1: str; Attribute2: str; Attribute3: str; Attribute4: str; Position: str
 class AssignSquadRequest(BaseModel): formation_name: str; role_map: Dict[str, str]; tier: str = "Iron"
 class MarketSearchRequest(BaseModel): role_name: str; auth_token: str; tier: str = "Iron"
@@ -58,28 +57,31 @@ def fetch_players() -> pd.DataFrame:
             m = p.get("metadata", {})
             positions_raw = m.get("positions", [])
             positions_norm = [(pos or "").strip().upper() for pos in positions_raw]
-            players.append({ "id": p.get("id"), "firstName": m.get("firstName", ""), "lastName": m.get("lastName", ""), "positions": positions_norm, "overall": m.get("overall", 0), "pace": m.get("pace", 0), "shooting": m.get("shooting", 0), "passing": m.get("passing", 0), "dribbling": m.get("dribbling", 0), "defense": m.get("defense", 0), "physical": m.get("physical", 0), "goalkeeping": m.get("goalkeeping", 0) })
+            players.append({ 
+                "id": p.get("id"), "firstName": m.get("firstName", ""), "lastName": m.get("lastName", ""), 
+                "positions": positions_norm, 
+                "age": m.get("age", 0), # Added age
+                "overall": m.get("overall", 0), "pace": m.get("pace", 0), "shooting": m.get("shooting", 0), 
+                "passing": m.get("passing", 0), "dribbling": m.get("dribbling", 0), "defense": m.get("defense", 0), 
+                "physical": m.get("physical", 0), "goalkeeping": m.get("goalkeeping", 0) 
+            })
     return pd.DataFrame(players)
 
-# --- CORRECTED: Function to fetch a single player by their ID using the Events API ---
 def fetch_single_player(player_id: int) -> pd.Series:
     try:
         r = requests.get(f"{EVENTS_API_BASE}?playerId={player_id}", timeout=30)
         r.raise_for_status()
         data = r.json()
-        
-        # Navigate the new, correct response structure
         player_data_from_api = data.get("resources", {}).get("players", {}).get(str(player_id))
-        
-        if not player_data_from_api:
-            return None
-
+        if not player_data_from_api: return None
         m = player_data_from_api.get("metadata", {})
         positions_raw = m.get("positions", [])
         positions_norm = [(pos or "").strip().upper() for pos in positions_raw]
         player_data = {
             "id": player_data_from_api.get("id"), "firstName": m.get("firstName", ""), "lastName": m.get("lastName", ""),
-            "positions": positions_norm, "overall": m.get("overall", 0), "pace": m.get("pace", 0),
+            "positions": positions_norm, 
+            "age": m.get("age", 0), # Added age
+            "overall": m.get("overall", 0), "pace": m.get("pace", 0),
             "shooting": m.get("shooting", 0), "passing": m.get("passing", 0), "dribbling": m.get("dribbling", 0),
             "defense": m.get("defense", 0), "physical": m.get("physical", 0), "goalkeeping": m.get("goalkeeping", 0)
         }
@@ -87,6 +89,10 @@ def fetch_single_player(player_id: int) -> pd.Series:
     except requests.exceptions.RequestException:
         return None
 
+def calc_fit(player: pd.Series, role_name: str, tier: str):
+    # (No changes to this function)
+    # ...
+    return int(score), label
 def calc_fit(player: pd.Series, role_name: str, tier: str):
     role_key = (role_name or "").strip().upper()
     role = ROLE_LOOKUP.get(role_key)
@@ -109,32 +115,53 @@ def calc_fit(player: pd.Series, role_name: str, tier: str):
 # --- Endpoints ---
 @app.get("/formations")
 def get_formations(): return {"formations": list(FORMATION_MAPS.keys())}
+
+# --- THIS ENDPOINT IS NOW MORE ROBUST ---
 @app.get("/formation/{formation_name}")
 def get_formation(formation_name: str):
-    fm = FORMATION_MAPS.get(formation_name)
-    if not fm: raise HTTPException(status_code=404, detail="Formation not found")
-    return fm
+    position_map = FORMATION_MAPS.get(formation_name)
+    if not position_map:
+        raise HTTPException(status_code=404, detail="Formation not found")
+
+    roles_by_position = {}
+    for role in ROLES_DATA:
+        pos = role.get("Position")
+        if pos not in roles_by_position:
+            roles_by_position[pos] = []
+        roles_by_position[pos].append(role.get("Role") or role.get("RoleType"))
+
+    # Build a more detailed map for the frontend
+    # It will look like: { "GK": {"position": "GK", "role": "GK-Sweeper"}, ... }
+    dynamic_role_map = {}
+    for slot, position in position_map.items():
+        default_role = "N/A"
+        if position in roles_by_position and roles_by_position[position]:
+            default_role = roles_by_position[position][0]
+        
+        dynamic_role_map[slot] = {
+            "position": position,
+            "role": default_role
+        }
+
+    return dynamic_role_map
+
 @app.get("/roles")
 def get_roles(): return ROLES_DATA
 @app.get("/attributes")
 def get_attributes(): return {"attributes": list(ATTR_MAP.keys())}
-
 @app.get("/player/{player_id}/analysis")
 def get_player_analysis(player_id: int, tier: str = "Iron"):
     player_series = fetch_single_player(player_id)
-    if player_series is None or player_series.empty:
-        raise HTTPException(status_code=404, detail="Player not found")
+    if player_series is None or player_series.empty: raise HTTPException(status_code=404, detail="Player not found")
     all_role_scores = []
     for role_data in ROLES_DATA:
         role_name = (role_data.get("Role") or role_data.get("RoleType") or "").strip().upper()
         score, label = calc_fit(player_series, role_name, tier)
-        if label != "Unusable":
-            all_role_scores.append({ "role": role_name, "score": score, "label": label })
+        if label != "Unusable": all_role_scores.append({ "role": role_name, "score": score, "label": label })
     all_role_scores.sort(key=lambda x: x["score"], reverse=True)
     positive_roles = [r for r in all_role_scores if r["score"] >= 0]
     best_role = all_role_scores[0] if all_role_scores else None
     return { "player_attributes": player_series.to_dict(), "best_role": best_role, "positive_roles": positive_roles }
-
 # ... (All other endpoints: assign_squad, search_market, and all CRUD endpoints remain the same) ...
 @app.post("/squad/assign")
 def assign_squad(req: AssignSquadRequest):
