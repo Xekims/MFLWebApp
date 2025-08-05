@@ -116,3 +116,38 @@ export async function deleteFormation(formationName) {
   if (!res.ok) throw new Error('Failed to delete formation');
   return res;
 }
+
+// --- NEW: CRUD Functions for Saved Squads ---
+export async function fetchSavedSquads() {
+  const res = await fetch(`${API_URL}/squads`);
+  return res.json();
+}
+
+export async function saveSquad(squadName, squadData) {
+  const payload = { squad_name: squadName, squad_data: squadData };
+  const res = await fetch(`${API_URL}/squads`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error('Failed to save squad');
+  return res.json();
+}
+
+export async function updateSquad(squadName, squadData) {
+  const res = await fetch(`${API_URL}/squads/${encodeURIComponent(squadName)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(squadData),
+  });
+  if (!res.ok) throw new Error('Failed to update squad');
+  return res.json();
+}
+
+export async function deleteSquad(squadName) {
+  const res = await fetch(`${API_URL}/squads/${encodeURIComponent(squadName)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error('Failed to delete squad');
+  return res;
+}

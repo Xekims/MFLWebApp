@@ -3,6 +3,26 @@
 import React, { useEffect, useState, useMemo } from "react";
 import * as api from "./api";
 
+// --- Reusable, Styled Dialog Component ---
+const Dialog = ({ title, children, onCancel, buttons }) => {
+  return (
+    <div className="modal-overlay">
+      <div className="dialog-card">
+        <h3>{title}</h3>
+        {children}
+        <div className="dialog-buttons">
+          {buttons.map(btn => (
+            <button key={btn.label} onClick={btn.onClick}>
+              {btn.label}
+            </button>
+          ))}
+          {onCancel && <button type="button" onClick={onCancel}>Cancel</button>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const attributeMap = {
   PAC: { label: 'PAC', key: 'pace' }, SHO: { label: 'SHO', key: 'shooting' }, PAS: { label: 'PAS', key: 'passing' },
   DRI: { label: 'DRI', key: 'dribbling' }, DEF: { label: 'DEF', key: 'defense' }, PHY: { label: 'PHY', key: 'physical' },
@@ -27,15 +47,19 @@ export default function SquadPicker() {
   const [marketResults, setMarketResults] = useState([]);
   const [isMarketLoading, setIsMarketLoading] = useState(false);
 
+  const [dialog, setDialog] = useState(null);
+  const [squadNameInput, setSquadNameInput] = useState("");
+
   useEffect(() => {
-    (async () => {
+    const fetchData = async () => {
       try {
         const formList = await api.fetchFormations();
         setFormations(formList?.formations ?? []);
         const rolesList = await api.fetchRoles();
         setAllRoles(rolesList ?? []);
       } catch (err) { console.error("Failed to load initial data", err); }
-    })();
+    };
+    fetchData();
   }, []);
 
   const rolesByPosition = useMemo(() => {
@@ -78,6 +102,26 @@ export default function SquadPicker() {
       setSquad(res?.squad ?? []);
     } catch (err) { console.error(err); setSquad([]); }
   }
+  
+  const handleSave = () => {
+    const defaultName = `${tier} - ${selectedFormation}`;
+    setSquadNameInput(defaultName);
+    setDialog({ type: 'saveSquad' });
+  };
+  
+  const confirmSaveSquad = async () => {
+      if (!squadNameInput) {
+          setDialog({ type: 'alert', message: "Please enter a name for the squad."});
+          return;
+      }
+      try {
+        await api.saveSquad(squadNameInput, squad);
+        setDialog({ type: 'alert', message: `Squad "${squadNameInput}" saved successfully!` });
+      } catch (error) {
+        console.error(error);
+        setDialog({ type: 'alert', message: "Failed to save squad. A squad with this name may already exist." });
+      }
+  };
 
   const { totalFitScore, averageFitScore } = useMemo(() => {
     if (!squad || squad.length === 0) return { totalFitScore: 0, averageFitScore: 0 };
@@ -91,7 +135,7 @@ export default function SquadPicker() {
   const handlePlayerClick = async (playerRow) => {
     if (playerRow.fit_label === "Unfilled") {
       if (!authToken) {
-        alert("Please enter an Authentication Token to search the marketplace.");
+        setDialog({ type: 'alert', message: "Please enter an Authentication Token to search the marketplace." });
         return;
       }
       setMarketModalRole(playerRow.assigned_role);
@@ -107,7 +151,6 @@ export default function SquadPicker() {
       }
       return;
     }
-    
     if (!playerRow.player_id) return;
     setIsAnalysisLoading(true);
     setAnalysisError('');
@@ -126,12 +169,8 @@ export default function SquadPicker() {
   
   const closeMarketModal = () => setMarketModalRole(null);
 
-  const sortMarketByPrice = () => {
-    setMarketResults([...marketResults].sort((a, b) => a.price - b.price));
-  };
-  const sortMarketByFit = () => {
-    setMarketResults([...marketResults].sort((a, b) => b.player.metadata.fit_score - a.player.metadata.fit_score));
-  };
+  const sortMarketByPrice = () => setMarketResults([...marketResults].sort((a, b) => a.price - b.price));
+  const sortMarketByFit = () => setMarketResults([...marketResults].sort((a, b) => b.player.metadata.fit_score - a.player.metadata.fit_score));
 
   const marketRoleAttributes = useMemo(() => {
     if (!marketModalRole || !allRoles.length) return [];
@@ -176,9 +215,12 @@ export default function SquadPicker() {
         <section>
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', marginBottom: '1rem'}}>
             <h2>Assigned Squad</h2>
-            <div style={{textAlign: 'right'}}>
-              <div>Total Fit Score: <span style={{color: 'var(--mikado-yellow)', fontWeight: 'bold', fontSize: '1.2em'}}>{totalFitScore}</span></div>
-              <div>Average Fit Score: <span style={{color: 'var(--mikado-yellow)', fontWeight: 'bold'}}>{averageFitScore}</span></div>
+            <div style={{display: 'flex', gap: '1rem', alignItems: 'center'}}>
+                 <div style={{textAlign: 'right'}}>
+                    <div>Total Fit Score: <span style={{color: 'var(--mikado-yellow)', fontWeight: 'bold', fontSize: '1.2em'}}>{totalFitScore}</span></div>
+                    <div>Average Fit Score: <span style={{color: 'var(--mikado-yellow)', fontWeight: 'bold'}}>{averageFitScore}</span></div>
+                </div>
+                <button onClick={handleSave}>Save Squad</button>
             </div>
           </div>
           <table>
@@ -194,17 +236,11 @@ export default function SquadPicker() {
         </section>
       )}
       
-       {/* Player Analysis Card Modal is unchanged */}
       {analyzedPlayer && (
         <div className="modal-overlay" onClick={() => setAnalyzedPlayer(null)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close-btn" onClick={() => setAnalyzedPlayer(null)}>X</button>
-            
-            {isAnalysisLoading && <div style={{padding: '4rem', textAlign: 'center'}}>Loading analysis...</div>}
-            
-            {analysisError && <div style={{padding: '4rem', textAlign: 'center', color: 'var(--mikado-yellow)'}}>{analysisError}</div>}
-
-            {!isAnalysisLoading && !analysisError && analysisData && (
+            {isAnalysisLoading ? <div style={{padding: '4rem', textAlign: 'center'}}>Loading analysis...</div> : analysisError ? <div style={{padding: '4rem', textAlign: 'center', color: 'var(--mikado-yellow)'}}>{analysisError}</div> : analysisData && (
               <div className="modal-content">
                 <div className="player-stat-card">
                   <div className="overall">{analysisData.player_attributes.overall}</div>
@@ -235,7 +271,6 @@ export default function SquadPicker() {
         </div>
       )}
 
-       {/* --- UPDATED: Marketplace Search Modal with Age and Highlighting --- */}
       {marketModalRole && (
         <div className="modal-overlay" onClick={closeMarketModal}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
@@ -251,25 +286,11 @@ export default function SquadPicker() {
               marketResults.length > 0 ? (
                 <div style={{maxHeight: '400px', overflowY: 'auto', padding: '0 2rem 2rem 2rem'}}>
                   <table>
-                    <thead>
-                      <tr>
-                        <th>Player</th>
-                        <th>Age</th>
-                        <th>Fit</th>
-                        <th>Price ($)</th>
-                        {marketRoleAttributes.map(attrCode => (
-                          <th key={attrCode}>{attributeMap[attrCode]?.label || attrCode}</th>
-                        ))}
-                      </tr>
-                    </thead>
+                    <thead><tr><th>Player</th><th>Age</th><th>Fit</th><th>Price ($)</th>{marketRoleAttributes.map(attrCode => (<th key={attrCode}>{attributeMap[attrCode]?.label || attrCode}</th>))}</tr></thead>
                     <tbody>
                       {marketResults.map(listing => {
                         const p = listing.player.metadata;
-                        // Determine the style for the age cell
-                        const ageStyle = {
-                          color: p.retirementYears ? 'var(--mikado-yellow)' : 'inherit',
-                          fontWeight: p.retirementYears ? 'bold' : 'normal'
-                        };
+                        const ageStyle = { color: p.retirementYears ? 'var(--mikado-yellow)' : 'inherit', fontWeight: p.retirementYears ? 'bold' : 'normal' };
                         return (
                           <tr key={listing.listingResourceId}>
                             <td>{p.firstName} {p.lastName}</td>
@@ -289,6 +310,19 @@ export default function SquadPicker() {
             }
           </div>
         </div>
+      )}
+
+      {dialog?.type === 'saveSquad' && (
+        <Dialog title="Save Squad" onCancel={() => setDialog(null)} buttons={[{ label: "Save", onClick: confirmSaveSquad }]}>
+          <p>Enter a unique name for this squad configuration.</p>
+          <input type="text" value={squadNameInput} onChange={(e) => setSquadNameInput(e.target.value)} />
+        </Dialog>
+      )}
+      
+      {dialog?.type === 'alert' && (
+        <Dialog title="Notification" buttons={[{ label: "OK", onClick: () => setDialog(null) }]}>
+          <p>{dialog.message}</p>
+        </Dialog>
       )}
     </div>
   );
