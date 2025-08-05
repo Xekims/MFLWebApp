@@ -12,15 +12,16 @@ from typing import Dict, List, Any
 ROLES_PATH = "roles.json"
 FORMATIONS_PATH = "formations.json"
 OWNER_WALLET = "0x5d4143c95673cba6"
-# --- UPDATED: Defined a base URL for the players API ---
 PLAYERS_API_BASE = "https://z519wdyajg.execute-api.us-east-1.amazonaws.com/prod/players"
 PLAYERS_API_OWNED = (f"{PLAYERS_API_BASE}?limit=1500&ownerWalletAddress={OWNER_WALLET}")
 MARKETPLACE_API = "https://z519wdyajg.execute-api.us-east-1.amazonaws.com/prod/listings"
+# NEW: The correct endpoint for fetching single player data
+EVENTS_API_BASE = "https://z519wdyajg.execute-api.us-east-1.amazonaws.com/prod/events"
 TIER_THRESH = {'Diamond':[97,93,90,87], 'Platinum':[93,90,87,84], 'Gold':[90,87,84,80], 'Silver':[87,84,80,77], 'Bronze':[84,80,77,74], 'Iron':[80,77,74,70], 'Stone':[77,74,70,66], 'Ice':[74,70,66,61], 'Spark':[70,66,61,57], 'Flint':[66,61,57,52]}
 ATTRIBUTE_WEIGHTS = [4, 3, 2, 1]
 ATTR_MAP = {"PAC": "pace", "SHO": "shooting", "PAS": "passing", "DRI": "dribbling", "DEF": "defense", "PHY": "physical", "GK": "goalkeeping"}
 
-# --- Data Loading & App Init (no changes) ---
+# --- Data Loading & App Init ---
 def load_roles():
     with open(ROLES_PATH, "r", encoding="utf-8") as f: return json.load(f)
 def load_formations():
@@ -31,7 +32,7 @@ ROLE_LOOKUP = {(r.get("Role") or r.get("RoleType") or "").strip().upper(): r for
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-# --- Helper functions to save data (no changes) ---
+# --- Helper functions to save data ---
 def save_roles(data: List[Dict]):
     global ROLES_DATA, ROLE_LOOKUP
     with open(ROLES_PATH, "w", encoding="utf-8") as f: json.dump(data, f, indent=2)
@@ -41,7 +42,7 @@ def save_formations(data: Dict):
     with open(FORMATIONS_PATH, "w", encoding="utf-8") as f: json.dump(data, f, indent=4)
     FORMATION_MAPS = data
 
-# --- Pydantic Models (no changes) ---
+# --- Pydantic Models ---
 class Role(BaseModel): Role: str; Attribute1: str; Attribute2: str; Attribute3: str; Attribute4: str; Position: str
 class AssignSquadRequest(BaseModel): formation_name: str; role_map: Dict[str, str]; tier: str = "Iron"
 class MarketSearchRequest(BaseModel): role_name: str; auth_token: str; tier: str = "Iron"
@@ -60,31 +61,33 @@ def fetch_players() -> pd.DataFrame:
             players.append({ "id": p.get("id"), "firstName": m.get("firstName", ""), "lastName": m.get("lastName", ""), "positions": positions_norm, "overall": m.get("overall", 0), "pace": m.get("pace", 0), "shooting": m.get("shooting", 0), "passing": m.get("passing", 0), "dribbling": m.get("dribbling", 0), "defense": m.get("defense", 0), "physical": m.get("physical", 0), "goalkeeping": m.get("goalkeeping", 0) })
     return pd.DataFrame(players)
 
-# --- NEW: Function to fetch a single player by their ID ---
+# --- CORRECTED: Function to fetch a single player by their ID using the Events API ---
 def fetch_single_player(player_id: int) -> pd.Series:
     try:
-        # Construct the URL to fetch a single player
-        r = requests.get(f"{PLAYERS_API_BASE}/{player_id}", timeout=30)
-        r.raise_for_status()  # This will raise an exception for 4xx or 5xx errors
-        p = r.json()
+        r = requests.get(f"{EVENTS_API_BASE}?playerId={player_id}", timeout=30)
+        r.raise_for_status()
+        data = r.json()
         
-        # The response for a single player is different, data is directly in 'metadata'
-        m = p.get("metadata", {})
+        # Navigate the new, correct response structure
+        player_data_from_api = data.get("resources", {}).get("players", {}).get(str(player_id))
+        
+        if not player_data_from_api:
+            return None
+
+        m = player_data_from_api.get("metadata", {})
         positions_raw = m.get("positions", [])
         positions_norm = [(pos or "").strip().upper() for pos in positions_raw]
         player_data = {
-            "id": p.get("id"), "firstName": m.get("firstName", ""), "lastName": m.get("lastName", ""),
+            "id": player_data_from_api.get("id"), "firstName": m.get("firstName", ""), "lastName": m.get("lastName", ""),
             "positions": positions_norm, "overall": m.get("overall", 0), "pace": m.get("pace", 0),
             "shooting": m.get("shooting", 0), "passing": m.get("passing", 0), "dribbling": m.get("dribbling", 0),
             "defense": m.get("defense", 0), "physical": m.get("physical", 0), "goalkeeping": m.get("goalkeeping", 0)
         }
         return pd.Series(player_data)
     except requests.exceptions.RequestException:
-        # If the request fails for any reason (including 404), return None
         return None
 
 def calc_fit(player: pd.Series, role_name: str, tier: str):
-    # (No changes to this function)
     role_key = (role_name or "").strip().upper()
     role = ROLE_LOOKUP.get(role_key)
     if not role: return -999, "Unknown"
@@ -116,10 +119,9 @@ def get_roles(): return ROLES_DATA
 @app.get("/attributes")
 def get_attributes(): return {"attributes": list(ATTR_MAP.keys())}
 
-# --- THIS ENDPOINT IS NOW CORRECTED TO USE THE NEW FUNCTION ---
 @app.get("/player/{player_id}/analysis")
 def get_player_analysis(player_id: int, tier: str = "Iron"):
-    player_series = fetch_single_player(player_id) # Use the new robust function
+    player_series = fetch_single_player(player_id)
     if player_series is None or player_series.empty:
         raise HTTPException(status_code=404, detail="Player not found")
     all_role_scores = []
