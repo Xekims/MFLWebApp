@@ -11,7 +11,7 @@ from typing import Dict, List, Any
 # --- Config ---
 ROLES_PATH = "roles.json"
 FORMATIONS_PATH = "formations.json"
-SQUADS_PATH = "squads.json" # NEW: Path for saved squads
+SQUADS_PATH = "squads.json"
 OWNER_WALLET = "0x5d4143c95673cba6"
 PLAYERS_API_BASE = "https://z519wdyajg.execute-api.us-east-1.amazonaws.com/prod/players"
 PLAYERS_API_OWNED = (f"{PLAYERS_API_BASE}?limit=1500&ownerWalletAddress={OWNER_WALLET}")
@@ -29,9 +29,10 @@ def load_formations():
 def load_squads():
     try:
         with open(SQUADS_PATH, "r", encoding="utf-8") as f: return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-ROLES_DATA, FORMATION_MAPS, SAVED_SQUADS = load_roles(), load_formations(), load_squads()
+    except (FileNotFoundError, json.JSONDecodeError): return {}
+ROLES_DATA = load_roles()
+FORMATION_MAPS = load_formations()
+SAVED_SQUADS = load_squads()
 ROLE_LOOKUP = {(r.get("Role") or r.get("RoleType") or "").strip().upper(): r for r in ROLES_DATA}
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -54,11 +55,9 @@ def save_squads(data: Dict):
 class Role(BaseModel): Role: str; Attribute1: str; Attribute2: str; Attribute3: str; Attribute4: str; Position: str
 class AssignSquadRequest(BaseModel): formation_name: str; role_map: Dict[str, str]; tier: str = "Iron"
 class MarketSearchRequest(BaseModel): role_name: str; auth_token: str; tier: str = "Iron"
-class Squad(BaseModel): squad_name: str; squad_data: List[Dict]
 class PlayerIdsRequest(BaseModel): player_ids: List[int]
 class SimulationRequest(BaseModel): player_ids: List[int]; role_map: Dict[str, str]; tier: str
 class Club(BaseModel): club_name: str; roster: List[int] = []
-
 
 # --- Data Fetch & Scoring ---
 def fetch_players_by_ids(player_ids: List[int]) -> pd.DataFrame:
@@ -67,7 +66,6 @@ def fetch_players_by_ids(player_ids: List[int]) -> pd.DataFrame:
         series = fetch_single_player(player_id)
         if series is not None: players.append(series.to_dict())
     return pd.DataFrame(players)
-# --- CORRECTED: fetch_players now ensures IDs are integers ---
 def fetch_players() -> pd.DataFrame:
     r = requests.get(PLAYERS_API_OWNED, timeout=30)
     players = []
@@ -76,20 +74,11 @@ def fetch_players() -> pd.DataFrame:
         data_list = data if isinstance(data, list) else data.get("players", [])
         for p in data_list:
             player_id = p.get("id")
-            # --- NEW: Skip any player from the API that doesn't have a valid ID ---
-            if player_id is None:
-                continue
-            
+            if player_id is None: continue
             m = p.get("metadata", {})
             positions_raw = m.get("positions", [])
             positions_norm = [(pos or "").strip().upper() for pos in positions_raw]
-            players.append({
-                "id": int(player_id), # Ensure the ID is an integer
-                "firstName": m.get("firstName", ""), "lastName": m.get("lastName", ""),"age": m.get("age", 0), 
-                "positions": positions_norm, "overall": m.get("overall", 0), "pace": m.get("pace", 0), 
-                "shooting": m.get("shooting", 0), "passing": m.get("passing", 0), "dribbling": m.get("dribbling", 0), 
-                "defense": m.get("defense", 0), "physical": m.get("physical", 0), "goalkeeping": m.get("goalkeeping", 0) 
-            })
+            players.append({ "id": int(player_id), "firstName": m.get("firstName", ""), "lastName": m.get("lastName", ""),"age": m.get("age", 0), "positions": positions_norm, "overall": m.get("overall", 0), "pace": m.get("pace", 0), "shooting": m.get("shooting", 0), "passing": m.get("passing", 0), "dribbling": m.get("dribbling", 0), "defense": m.get("defense", 0), "physical": m.get("physical", 0), "goalkeeping": m.get("goalkeeping", 0) })
     return pd.DataFrame(players)
 def fetch_single_player(player_id: int) -> pd.Series:
     try:
@@ -159,8 +148,65 @@ def get_player_analysis(player_id: int, tier: str = "Iron"):
     positive_roles = [r for r in all_role_scores if r["score"] >= 0]
     best_role = all_role_scores[0] if all_role_scores else None
     return { "player_attributes": player_series.to_dict(), "best_role": best_role, "positive_roles": positive_roles }
-
-# --- NEW: Endpoint for the Agency Page ---
+@app.post("/squad/assign")
+def assign_squad(req: AssignSquadRequest):
+    players_df = fetch_players()
+    if not players_df.empty: players_df['id'] = players_df['id'].astype(int)
+    saved_squads = load_squads()
+    used_player_ids = set()
+    for club_name, roster_ids in saved_squads.items():
+        for player_id in roster_ids:
+            used_player_ids.add(int(player_id))
+    available_players_df = players_df[~players_df['id'].isin(used_player_ids)]
+    all_options = []
+    for slot, role_name in req.role_map.items():
+        for _, pl in available_players_df.iterrows():
+            score, label = calc_fit(pl, role_name, req.tier)
+            if label == "Unusable": continue
+            all_options.append({ "score": score, "label": label, "player": pl.to_dict(), "slot": slot, "role_name": role_name })
+    all_options.sort(key=lambda x: x["score"], reverse=True)
+    assigned_in_this_run = set()
+    final_assignments = {}
+    for option in all_options:
+        player_id = option["player"]["id"]
+        slot = option["slot"]
+        if slot in final_assignments or player_id in assigned_in_this_run: continue
+        final_assignments[slot] = { "slot": slot, "position": ROLE_LOOKUP.get((option["role_name"] or "").strip().upper(), {}).get("Position", ""), "assigned_role": option["role_name"], "player_name": f"{option['player'].get('firstName', '')} {option['player'].get('lastName', '')}".strip(), "player_id": player_id, "fit_score": option["score"], "fit_label": option["label"] }
+        assigned_in_this_run.add(player_id)
+    squad_rows = []
+    for slot, role_name in req.role_map.items():
+        if slot in final_assignments: squad_rows.append(final_assignments[slot])
+        else: squad_rows.append({ "slot": slot, "position": ROLE_LOOKUP.get((role_name or "").strip().upper(), {}).get("Position", ""), "assigned_role": role_name, "player_name": "", "player_id": "", "fit_score": "", "fit_label": "Unfilled" })
+    return {"squad": squad_rows}
+@app.post("/market/search")
+def search_market(req: MarketSearchRequest):
+    role_key = (req.role_name or "").strip().upper()
+    role = ROLE_LOOKUP.get(role_key)
+    if not role: raise HTTPException(status_code=404, detail="Role not found")
+    params = {"limit": 25, "type": "PLAYER", "status": "AVAILABLE", "view": "full"}
+    required_position = role.get("Position")
+    if required_position: params["positions"] = required_position
+    thresholds = TIER_THRESH["Iron"]
+    for i, attr_field in enumerate(["Attribute1", "Attribute2", "Attribute3", "Attribute4"]):
+        code = (role.get(attr_field) or "").strip().upper()
+        if not code: continue
+        player_attr_col = ATTR_MAP.get(code)
+        if not player_attr_col: continue
+        params[f"{player_attr_col}Min"] = thresholds[i]
+    headers = {"Authorization": f"Bearer {req.auth_token}"}
+    try:
+        r = requests.get(MARKETPLACE_API, headers=headers, params=params, timeout=30)
+        r.raise_for_status()
+        listings = r.json()
+        for listing in listings:
+            player_data = listing.get("player", {}).get("metadata", {})
+            player_series = pd.Series(player_data)
+            score, label = calc_fit(player_series, req.role_name, req.tier)
+            listing["player"]["metadata"]["fit_score"] = score
+            listing["player"]["metadata"]["fit_label"] = label
+        return listings
+    except requests.exceptions.HTTPError as e: raise HTTPException(status_code=e.response.status_code, detail=e.response.json())
+    except requests.exceptions.RequestException as e: raise HTTPException(status_code=500, detail=f"Failed to contact marketplace API: {e}")
 @app.get("/players/owned")
 def get_owned_players_with_club_assignment():
     players_df = fetch_players()
@@ -169,59 +215,11 @@ def get_owned_players_with_club_assignment():
     for club_name, roster_ids in squads.items():
         for player_id in roster_ids:
             player_to_club_map[int(player_id)] = club_name
-    
     if not players_df.empty:
         players_df['assigned_club'] = players_df['id'].map(player_to_club_map).fillna("Unassigned")
     else:
         players_df['assigned_club'] = "Unassigned"
-        
     return json.loads(players_df.to_json(orient="records"))
-
-# --- All other endpoints for squad assignment, search, and CRUD ---
-
-@app.post("/squad/assign")
-def assign_squad(req: AssignSquadRequest):
-    players_df = fetch_players()
-    
-    # --- THIS IS THE FIX ---
-    # Ensure the 'id' column is of integer type to prevent comparison errors
-    if not players_df.empty:
-        players_df['id'] = players_df['id'].astype(int)
-
-    saved_squads = load_squads()
-    used_player_ids = set()
-    for squad in saved_squads.values():
-        for player in squad.get("squad_data", []):
-            player_id = player.get("player_id")
-            if player_id: used_player_ids.add(int(player_id))
-
-    available_players_df = players_df[~players_df['id'].isin(used_player_ids)]
-
-    all_options = []
-    for slot, role_name in req.role_map.items():
-        for _, pl in available_players_df.iterrows():
-            score, label = calc_fit(pl, role_name, req.tier)
-            if label == "Unusable": continue
-            all_options.append({ "score": score, "label": label, "player": pl.to_dict(), "slot": slot, "role_name": role_name })
-    
-    all_options.sort(key=lambda x: x["score"], reverse=True)
-    
-    assigned_in_this_run = set()
-    final_assignments = {}
-    for option in all_options:
-        player_id = option["player"]["id"]
-        slot = option["slot"]
-        if slot in final_assignments or player_id in assigned_in_this_run:
-             continue
-        final_assignments[slot] = { "slot": slot, "position": ROLE_LOOKUP.get((option["role_name"] or "").strip().upper(), {}).get("Position", ""), "assigned_role": option["role_name"], "player_name": f"{option['player'].get('firstName', '')} {option['player'].get('lastName', '')}".strip(), "player_id": player_id, "fit_score": option["score"], "fit_label": option["label"] }
-        assigned_in_this_run.add(player_id)
-
-    squad_rows = []
-    for slot, role_name in req.role_map.items():
-        if slot in final_assignments: squad_rows.append(final_assignments[slot])
-        else: squad_rows.append({ "slot": slot, "position": ROLE_LOOKUP.get((role_name or "").strip().upper(), {}).get("Position", ""), "assigned_role": role_name, "player_name": "", "player_id": "", "fit_score": "", "fit_label": "Unfilled" })
-    
-    return {"squad": squad_rows}
 @app.post("/players/by_ids")
 def get_players_by_ids(req: PlayerIdsRequest):
     players_df = fetch_players_by_ids(req.player_ids)
@@ -278,36 +276,6 @@ def delete_club(club_name: str):
     del clubs[club_name]
     save_squads(clubs)
     return {"message": "Club deleted."}
-    return {"squad": squad_rows}
-@app.post("/market/search")
-def search_market(req: MarketSearchRequest):
-    role_key = (req.role_name or "").strip().upper()
-    role = ROLE_LOOKUP.get(role_key)
-    if not role: raise HTTPException(status_code=404, detail="Role not found")
-    params = {"limit": 25, "type": "PLAYER", "status": "AVAILABLE", "view": "full"}
-    required_position = role.get("Position")
-    if required_position: params["positions"] = required_position
-    thresholds = TIER_THRESH["Iron"]
-    for i, attr_field in enumerate(["Attribute1", "Attribute2", "Attribute3", "Attribute4"]):
-        code = (role.get(attr_field) or "").strip().upper()
-        if not code: continue
-        player_attr_col = ATTR_MAP.get(code)
-        if not player_attr_col: continue
-        params[f"{player_attr_col}Min"] = thresholds[i]
-    headers = {"Authorization": f"Bearer {req.auth_token}"}
-    try:
-        r = requests.get(MARKETPLACE_API, headers=headers, params=params, timeout=30)
-        r.raise_for_status()
-        listings = r.json()
-        for listing in listings:
-            player_data = listing.get("player", {}).get("metadata", {})
-            player_series = pd.Series(player_data)
-            score, label = calc_fit(player_series, req.role_name, req.tier)
-            listing["player"]["metadata"]["fit_score"] = score
-            listing["player"]["metadata"]["fit_label"] = label
-        return listings
-    except requests.exceptions.HTTPError as e: raise HTTPException(status_code=e.response.status_code, detail=e.response.json())
-    except requests.exceptions.RequestException as e: raise HTTPException(status_code=500, detail=f"Failed to contact marketplace API: {e}")
 @app.post("/roles", status_code=201)
 def create_role(role: Role):
     roles = load_roles()
@@ -357,39 +325,5 @@ def delete_formation(formation_name: str):
     formations = load_formations()
     if formation_name not in formations: raise HTTPException(status_code=404, detail="Formation not found")
     del formations[formation_name]
-    save_formations(formations)
+    save_squads(formations)
     return {"message": "Formation deleted"}
-@app.get("/squads")
-def get_squads(): return load_squads()
-@app.post("/squads", status_code=201)
-def create_squad(squad: Squad):
-    squads = load_squads()
-    if squad.squad_name in squads: raise HTTPException(status_code=400, detail="A squad with this name already exists.")
-    squads[squad.squad_name] = squad.dict()
-    save_squads(squads)
-    return squad
-@app.put("/squads/{squad_name}")
-def update_squad(squad_name: str, squad_data: List[Dict] = Body(...)):
-    squads = load_squads()
-    if squad_name not in squads: raise HTTPException(status_code=404, detail="Squad not found.")
-    squads[squad_name]["squad_data"] = squad_data
-    save_squads(squads)
-    return squads[squad_name]
-@app.delete("/squads/{squad_name}", status_code=204)
-def delete_squad(squad_name: str):
-    squads = load_squads()
-    if squad_name not in squads: raise HTTPException(status_code=404, detail="Squad not found.")
-    del squads[squad_name]
-    save_squads(squads)
-    return {"message": "Squad deleted."}
-# --- NEW: Endpoint for the Agency Page (Restored) ---
-@app.get("/players/owned")
-def get_owned_players_with_club_assignment():
-    players_df = fetch_players()
-    squads = load_squads()
-    player_to_club_map = {}
-    for club_name, roster_ids in squads.items():
-        for player_id in roster_ids:
-            player_to_club_map[player_id] = club_name
-    players_df['assigned_club'] = players_df['id'].map(player_to_club_map).fillna("Unassigned")
-    return json.loads(players_df.to_json(orient="records"))
