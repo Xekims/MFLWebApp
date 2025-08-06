@@ -296,7 +296,7 @@ export default function SquadPicker() {
                             <td>{p.firstName} {p.lastName}</td>
                             <td style={ageStyle}>{p.age}</td>
                             <td>{p.fit_score} ({p.fit_label})</td>
-                            <td>{listing.price ? listing.price.toLocaleString() : 'N/A'}</td>
+                            <td>{listing.price ? `${listing.price.toLocaleString()}` : 'N/A'}</td>
                             {marketRoleAttributes.map(attrCode => (
                               <td key={attrCode}>{p[attributeMap[attrCode]?.key] || '-'}</td>
                             ))}
@@ -311,7 +311,8 @@ export default function SquadPicker() {
           </div>
         </div>
       )}
-
+      
+      {/* --- CORRECTED: Full implementation of the dialog modals --- */}
       {dialog?.type === 'saveSquad' && (
         <Dialog title="Save Squad" onCancel={() => setDialog(null)} buttons={[{ label: "Save", onClick: confirmSaveSquad }]}>
           <p>Enter a unique name for this squad configuration.</p>
