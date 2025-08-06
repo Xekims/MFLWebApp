@@ -3,26 +3,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import * as api from "./api";
 
-// --- Reusable, Styled Dialog Component ---
-const Dialog = ({ title, children, onCancel, buttons }) => {
-  return (
-    <div className="modal-overlay">
-      <div className="dialog-card">
-        <h3>{title}</h3>
-        {children}
-        <div className="dialog-buttons">
-          {buttons.map(btn => (
-            <button key={btn.label} onClick={btn.onClick}>
-              {btn.label}
-            </button>
-          ))}
-          {onCancel && <button type="button" onClick={onCancel}>Cancel</button>}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const attributeMap = {
   PAC: { label: 'PAC', key: 'pace' }, SHO: { label: 'SHO', key: 'shooting' }, PAS: { label: 'PAS', key: 'passing' },
   DRI: { label: 'DRI', key: 'dribbling' }, DEF: { label: 'DEF', key: 'defense' }, PHY: { label: 'PHY', key: 'physical' },
@@ -105,22 +85,16 @@ export default function SquadPicker() {
   
   const handleSave = () => {
     const defaultName = `${tier} - ${selectedFormation}`;
-    setSquadNameInput(defaultName);
-    setDialog({ type: 'saveSquad' });
-  };
-  
-  const confirmSaveSquad = async () => {
-      if (!squadNameInput) {
-          setDialog({ type: 'alert', message: "Please enter a name for the squad."});
-          return;
-      }
+    const squadName = prompt("Enter a name for this squad:", defaultName);
+    if (squadName) {
       try {
-        await api.saveSquad(squadNameInput, squad);
-        setDialog({ type: 'alert', message: `Squad "${squadNameInput}" saved successfully!` });
+        api.saveSquad(squadName, squad);
+        alert(`Squad "${squadName}" saved successfully!`);
       } catch (error) {
         console.error(error);
-        setDialog({ type: 'alert', message: "Failed to save squad. A squad with this name may already exist." });
+        alert("Failed to save squad. A squad with this name may already exist.");
       }
+    }
   };
 
   const { totalFitScore, averageFitScore } = useMemo(() => {
@@ -135,7 +109,7 @@ export default function SquadPicker() {
   const handlePlayerClick = async (playerRow) => {
     if (playerRow.fit_label === "Unfilled") {
       if (!authToken) {
-        setDialog({ type: 'alert', message: "Please enter an Authentication Token to search the marketplace." });
+        alert("Please enter an Authentication Token to search the marketplace.");
         return;
       }
       setMarketModalRole(playerRow.assigned_role);
@@ -151,6 +125,7 @@ export default function SquadPicker() {
       }
       return;
     }
+    
     if (!playerRow.player_id) return;
     setIsAnalysisLoading(true);
     setAnalysisError('');
@@ -169,8 +144,12 @@ export default function SquadPicker() {
   
   const closeMarketModal = () => setMarketModalRole(null);
 
-  const sortMarketByPrice = () => setMarketResults([...marketResults].sort((a, b) => a.price - b.price));
-  const sortMarketByFit = () => setMarketResults([...marketResults].sort((a, b) => b.player.metadata.fit_score - a.player.metadata.fit_score));
+  const sortMarketByPrice = () => {
+    setMarketResults([...marketResults].sort((a, b) => a.price - b.price));
+  };
+  const sortMarketByFit = () => {
+    setMarketResults([...marketResults].sort((a, b) => b.player.metadata.fit_score - a.player.metadata.fit_score));
+  };
 
   const marketRoleAttributes = useMemo(() => {
     if (!marketModalRole || !allRoles.length) return [];
@@ -213,6 +192,7 @@ export default function SquadPicker() {
 
       {squad.length > 0 && (
         <section>
+          {/* --- SAVE SQUAD BUTTON RESTORED HERE --- */}
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', marginBottom: '1rem'}}>
             <h2>Assigned Squad</h2>
             <div style={{display: 'flex', gap: '1rem', alignItems: 'center'}}>
@@ -311,20 +291,8 @@ export default function SquadPicker() {
           </div>
         </div>
       )}
-      
-      {/* --- CORRECTED: Full implementation of the dialog modals --- */}
-      {dialog?.type === 'saveSquad' && (
-        <Dialog title="Save Squad" onCancel={() => setDialog(null)} buttons={[{ label: "Save", onClick: confirmSaveSquad }]}>
-          <p>Enter a unique name for this squad configuration.</p>
-          <input type="text" value={squadNameInput} onChange={(e) => setSquadNameInput(e.target.value)} />
-        </Dialog>
-      )}
-      
-      {dialog?.type === 'alert' && (
-        <Dialog title="Notification" buttons={[{ label: "OK", onClick: () => setDialog(null) }]}>
-          <p>{dialog.message}</p>
-        </Dialog>
-      )}
+
+    
     </div>
   );
 }
