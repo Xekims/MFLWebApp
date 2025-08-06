@@ -171,35 +171,60 @@ tbody tr:hover { background-color: rgba(0, 29, 61, 0.5); }
 }
 
 /* --- 8. STYLES FOR CUSTOM DIALOG/PROMPT --- */
-.dialog-card {
+/* Refactored to be a more generic and reusable modal system */
+.modal {
   background-color: var(--oxford-blue);
-  padding: 2rem;
   border-radius: 12px;
   border: 1px solid var(--yale-blue);
   width: 90%;
-  max-width: 500px; /* Smaller than the player card */
-  text-align: center;
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Ensures children conform to border-radius */
+  max-height: 80vh;
 }
 
-.dialog-card h3 {
+.modal-header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.modal-header h3 {
   margin-top: 0;
+  margin-bottom: 0;
   color: var(--gold);
+  font-size: 1.5em;
 }
 
-.dialog-card p {
+.modal-body {
+  padding: 1.5rem;
+  overflow-y: auto; /* Allows content like long tables to scroll */
+}
+
+.modal-body p {
   color: var(--text-secondary);
+  margin-top: 0;
 }
 
-.dialog-card input {
+.modal-body input,
+.modal-body select {
   width: 100%;
   box-sizing: border-box; /* Ensures padding doesn't affect width */
-  margin: 1.5rem 0;
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
 }
 
-.dialog-buttons {
+.modal-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-color);
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
   gap: 1rem;
-  margin-top: 1.5rem;
+  background-color: rgba(0, 8, 20, 0.5); /* Slightly darker footer for emphasis */
 }
+
+/* Sizing classes for different modal types */
+.modal.modal-sm { max-width: 500px; }
+.modal.modal-md { max-width: 700px; }
+.modal.modal-lg { max-width: 950px; }

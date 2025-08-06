@@ -110,14 +110,6 @@ export async function updateClubRoster(clubName, roster) {
   return res.json();
 }
 
-export async function deleteClub(clubName) {
-  const res = await fetch(`${API_URL}/clubs/${encodeURIComponent(clubName)}`, {
-    method: 'DELETE',
-  });
-  if (!res.ok) throw new Error('Failed to delete club');
-  return res;
-}
-
 
 // --- CRUD for Roles & Formations ---
 
@@ -180,4 +172,31 @@ export async function deleteFormation(formationName) {
   });
   if (!res.ok) throw new Error('Failed to delete formation');
   return res;
+}
+
+// In your api.js file
+export async function fetchClubByName(clubName) {
+    // Use the existing API_URL constant defined at the top of this file.
+    const response = await fetch(`${API_URL}/clubs/${encodeURIComponent(clubName)}`);
+    if (!response.ok) {
+        // Return null for 404 so the component can handle it gracefully
+        if (response.status === 404) return null;
+        throw new Error(`Failed to fetch club ${clubName}`);
+    }
+    return response.json();
+}
+
+// Add this function to your d:\MFL\WebApp\frontend\src\api.js file
+
+export async function deleteClub(clubName) {
+  const response = await fetch(`${API_URL}/clubs/${encodeURIComponent(clubName)}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    // Try to get a more specific error message from the backend
+    const errorData = await response.json().catch(() => ({ detail: 'Failed to delete club.' }));
+    throw new Error(errorData.detail);
+  }
+  // The backend returns a success message which we can return or ignore
+  return response.json();
 }

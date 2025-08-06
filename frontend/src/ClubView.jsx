@@ -10,6 +10,7 @@ const AddPlayerModal = ({ onAdd, onCancel, clubRosterIds }) => {
     const [agencyPlayers, setAgencyPlayers] = useState([]);
     const [selectedPlayers, setSelectedPlayers] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [sortConfig, setSortConfig] = useState({ key: 'overall', direction: 'descending' });
 
     useEffect(() => {
         (async () => {
@@ -20,6 +21,35 @@ const AddPlayerModal = ({ onAdd, onCancel, clubRosterIds }) => {
             setIsLoading(false);
         })();
     }, [clubRosterIds]);
+
+    const sortedAgencyPlayers = useMemo(() => {
+        let sortablePlayers = [...agencyPlayers];
+        if (sortConfig.key) {
+            sortablePlayers.sort((a, b) => {
+                if (a[sortConfig.key] < b[sortConfig.key]) {
+                    return sortConfig.direction === 'ascending' ? -1 : 1;
+                }
+                if (a[sortConfig.key] > b[sortConfig.key]) {
+                    return sortConfig.direction === 'ascending' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+        return sortablePlayers;
+    }, [agencyPlayers, sortConfig]);
+
+    const requestSort = (key) => {
+        let direction = 'ascending';
+        if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+            direction = 'descending';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const getSortIndicator = (key) => {
+        if (sortConfig.key !== key) return null;
+        return sortConfig.direction === 'ascending' ? ' ▲' : ' ▼';
+    };
 
     const handleSelectPlayer = (playerId) => {
         if (selectedPlayers.includes(playerId)) {
@@ -35,16 +65,25 @@ const AddPlayerModal = ({ onAdd, onCancel, clubRosterIds }) => {
 
     return (
         <div className="modal-overlay">
-            <div className="modal-card">
-                <button className="modal-close-btn" onClick={onCancel}>X</button>
-                <h2>Add Players to Roster</h2>
-                {/* Add tabs here in the future if needed */}
-                {isLoading ? <p>Loading available players...</p> : (
-                    <div style={{maxHeight: '400px', overflowY: 'auto'}}>
+            <div className="modal modal-md">
+                <div className="modal-header">
+                    <h3>Add Players to Roster</h3>
+                </div>
+                <div className="modal-body">
+                    {isLoading ? <p>Loading available players...</p> : (
                         <table>
-                            <thead><tr><th>Select</th><th>Name</th><th>Overall</th><th>Positions</th></tr></thead>
+                            <thead>
+                                <tr>
+                                    <th>Select</th>
+                                    <th>Name</th>
+                                    <th onClick={() => requestSort('overall')} style={{cursor: 'pointer'}}>
+                                        Overall{getSortIndicator('overall')}
+                                    </th>
+                                    <th>Positions</th>
+                                </tr>
+                            </thead>
                             <tbody>
-                                {agencyPlayers.map(p => (
+                                {sortedAgencyPlayers.map(p => (
                                     <tr key={p.id}>
                                         <td><input type="checkbox" checked={selectedPlayers.includes(p.id)} onChange={() => handleSelectPlayer(p.id)} /></td>
                                         <td>{p.firstName} {p.lastName}</td>
@@ -54,9 +93,9 @@ const AddPlayerModal = ({ onAdd, onCancel, clubRosterIds }) => {
                                 ))}
                             </tbody>
                         </table>
-                    </div>
-                )}
-                <div style={{marginTop: '1rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem'}}>
+                    )}
+                </div>
+                <div className="modal-footer">
                     <button onClick={onCancel}>Cancel</button>
                     <button onClick={handleSave}>Add Selected Players</button>
                 </div>
@@ -85,22 +124,29 @@ export default function ClubView() {
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      const clubs = await api.fetchClubs();
-      const ids = clubs[clubName] || [];
-      setRosterIds(ids);
-      if (ids.length > 0) {
-        const players = await api.fetchPlayersByIds(ids);
-        setRosterPlayers(players);
+      setError('');
+
+      // Fetch the single club with its full roster in one efficient call
+      const clubData = await api.fetchClubByName(clubName);
+
+      if (clubData) {
+        const roster = clubData.roster || [];
+        setRosterPlayers(roster);
+        setRosterIds(roster.map(p => p.id));
+        setTier(clubData.tier || 'Iron'); // Use the club's actual tier
       } else {
         setRosterPlayers([]);
+        setRosterIds([]);
+        setError(`Club "${clubName}" not found.`);
       }
-      const formList = await api.fetchFormations();
+
+      // Fetch static data
+      const [formList, rolesList] = await Promise.all([api.fetchFormations(), api.fetchRoles()]);
       setFormations(formList?.formations ?? []);
-      const rolesList = await api.fetchRoles();
       setAllRoles(rolesList ?? []);
     } catch(err) {
       console.error("Failed to load club data", err);
-      setError("Could not load club data.");
+      setError("Could not load club data. It may have been deleted or the server is unavailable.");
     } finally {
       setIsLoading(false);
     }

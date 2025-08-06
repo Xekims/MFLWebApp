@@ -57,7 +57,10 @@ class AssignSquadRequest(BaseModel): formation_name: str; role_map: Dict[str, st
 class MarketSearchRequest(BaseModel): role_name: str; auth_token: str; tier: str = "Iron"
 class PlayerIdsRequest(BaseModel): player_ids: List[int]
 class SimulationRequest(BaseModel): player_ids: List[int]; role_map: Dict[str, str]; tier: str
-class Club(BaseModel): club_name: str; roster: List[int] = []
+class Club(BaseModel):
+    club_name: str
+    tier: str = "Iron"
+    roster: List[int] = []
 
 # --- Data Fetch & Scoring ---
 def fetch_players_by_ids(player_ids: List[int]) -> pd.DataFrame:
@@ -153,8 +156,12 @@ def assign_squad(req: AssignSquadRequest):
     players_df = fetch_players()
     if not players_df.empty: players_df['id'] = players_df['id'].astype(int)
     saved_squads = load_squads()
+
     used_player_ids = set()
-    for club_name, roster_ids in saved_squads.items():
+    for club_name, club_data in saved_squads.items():
+        # Handle both old format (list) and new format (dict)
+        roster_ids = club_data.get("roster", []) if isinstance(club_data, dict) else club_data
+        if not isinstance(roster_ids, list): continue # Skip malformed entries
         for player_id in roster_ids:
             used_player_ids.add(int(player_id))
     available_players_df = players_df[~players_df['id'].isin(used_player_ids)]
@@ -212,7 +219,9 @@ def get_owned_players_with_club_assignment():
     players_df = fetch_players()
     squads = load_squads()
     player_to_club_map = {}
-    for club_name, roster_ids in squads.items():
+    for club_name, club_data in squads.items():
+        # Handle both old format (list) and new format (dict) for backward compatibility
+        roster_ids = club_data.get("roster", []) if isinstance(club_data, dict) else club_data
         for player_id in roster_ids:
             player_to_club_map[int(player_id)] = club_name
     if not players_df.empty:
@@ -250,14 +259,48 @@ def simulate_squad(req: SimulationRequest):
         else: squad_rows.append({ "slot": slot, "position": ROLE_LOOKUP.get((role_name or "").strip().upper(), {}).get("Position", ""), "assigned_role": role_name, "player_name": "", "player_id": "", "fit_score": "", "fit_label": "Unfilled" })
     return {"squad": squad_rows}
 @app.get("/clubs")
-def get_clubs():
-    return load_squads()
+def get_clubs() -> List[Club]:
+    squads_data = load_squads()
+    club_list = []
+    for club_name, club_data in squads_data.items():
+        # Handle new format: {"club_name": "...", "tier": "...", "roster": []}
+        if isinstance(club_data, dict) and "club_name" in club_data:
+            club_list.append(club_data)
+        # Handle old format: [1, 2, 3] and convert it to the new format
+        elif isinstance(club_data, list):
+            club_list.append({
+                "club_name": club_name,
+                "tier": "Iron", # Default tier for old data
+                "roster": club_data
+            })
+    return club_list
+@app.get("/clubs/{club_name}")
+def get_club_with_players(club_name: str):
+    clubs = load_squads()
+    club_data = clubs.get(club_name)
+    if not club_data:
+        raise HTTPException(status_code=404, detail="Club not found")
+
+    # Standardize the club data into the new dictionary format
+    if isinstance(club_data, list):
+        club_dict = {"club_name": club_name, "tier": "Iron", "roster": club_data}
+    elif isinstance(club_data, dict):
+        club_dict = club_data
+    else:
+        raise HTTPException(status_code=500, detail="Malformed club data in squads.json")
+
+    roster_ids = club_dict.get("roster", [])
+    if roster_ids:
+        players_df = fetch_players_by_ids(roster_ids)
+        club_dict["roster"] = json.loads(players_df.to_json(orient="records")) if not players_df.empty else []
+    
+    return club_dict
 @app.post("/clubs")
 def create_club(club: Club):
     clubs = load_squads()
     if club.club_name in clubs:
         raise HTTPException(status_code=400, detail="A club with this name already exists.")
-    clubs[club.club_name] = club.roster
+    clubs[club.club_name] = club.dict()
     save_squads(clubs)
     return club
 @app.put("/clubs/{club_name}")
@@ -265,9 +308,15 @@ def update_club_roster(club_name: str, roster: List[int] = Body(...)):
     clubs = load_squads()
     if club_name not in clubs:
         raise HTTPException(status_code=404, detail="Club not found.")
-    clubs[club_name] = roster
+    club_data = clubs[club_name]
+    # If data is in the old list format, upgrade it to the new dict format on update.
+    if isinstance(club_data, list):
+        clubs[club_name] = {"club_name": club_name, "tier": "Iron", "roster": roster}
+    # Otherwise, just update the roster in the existing dict.
+    elif isinstance(club_data, dict):
+        clubs[club_name]["roster"] = roster
     save_squads(clubs)
-    return {club_name: roster}
+    return clubs[club_name]
 @app.delete("/clubs/{club_name}")
 def delete_club(club_name: str):
     clubs = load_squads()
@@ -325,5 +374,5 @@ def delete_formation(formation_name: str):
     formations = load_formations()
     if formation_name not in formations: raise HTTPException(status_code=404, detail="Formation not found")
     del formations[formation_name]
-    save_squads(formations)
+    save_formations(formations)
     return {"message": "Formation deleted"}
