@@ -138,6 +138,12 @@ def get_formation(formation_name: str):
 def get_roles(): return ROLES_DATA
 @app.get("/attributes")
 def get_attributes(): return {"attributes": list(ATTR_MAP.keys())}
+@app.get("/tiers")
+def get_tiers():
+    return {"tiers": list(TIER_THRESH.keys())}
+@app.get("/tier_thresholds")
+def get_tier_thresholds():
+    return TIER_THRESH
 @app.get("/player/{player_id}/analysis")
 def get_player_analysis(player_id: int, tier: str = "Iron"):
     player_series = fetch_single_player(player_id)
@@ -217,6 +223,27 @@ def search_market(req: MarketSearchRequest):
 @app.get("/players/owned")
 def get_owned_players_with_club_assignment():
     players_df = fetch_players()
+    if players_df.empty:
+        return []
+
+    # --- Calculate Best Tier and Best Role for each player ---
+    # This is computationally intensive and is best performed on the backend.
+    sorted_tiers = list(TIER_THRESH.keys()) # Tiers are already ordered from highest to lowest
+
+    def find_best_fit(player_series):
+        for tier in sorted_tiers:
+            for role_data in ROLES_DATA:
+                role_name = (role_data.get("Role") or role_data.get("RoleType") or "").strip().upper()
+                if not role_name: continue
+                
+                score, label = calc_fit(player_series, role_name, tier)
+                if score >= 0:
+                    return pd.Series([tier, role_name], index=['bestTier', 'bestRole'])
+        return pd.Series(["Unrated", "N/A"], index=['bestTier', 'bestRole'])
+
+    best_fit_df = players_df.apply(find_best_fit, axis=1)
+    players_df = pd.concat([players_df, best_fit_df], axis=1)
+
     squads = load_squads()
     player_to_club_map = {}
     for club_name, club_data in squads.items():
@@ -224,10 +251,7 @@ def get_owned_players_with_club_assignment():
         roster_ids = club_data.get("roster", []) if isinstance(club_data, dict) else club_data
         for player_id in roster_ids:
             player_to_club_map[int(player_id)] = club_name
-    if not players_df.empty:
-        players_df['assigned_club'] = players_df['id'].map(player_to_club_map).fillna("Unassigned")
-    else:
-        players_df['assigned_club'] = "Unassigned"
+    players_df['assigned_club'] = players_df['id'].map(player_to_club_map).fillna("Unassigned")
     return json.loads(players_df.to_json(orient="records"))
 @app.post("/players/by_ids")
 def get_players_by_ids(req: PlayerIdsRequest):

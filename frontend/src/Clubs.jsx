@@ -6,22 +6,31 @@ import * as api from './api';
 
 export default function Clubs() {
   const [clubs, setClubs] = useState([]);
+  const [tiers, setTiers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newClubName, setNewClubName] = useState('');
-  const [newClubTier, setNewClubTier] = useState('Gold');
+  const [newClubTier, setNewClubTier] = useState('');
   const [clubToDelete, setClubToDelete] = useState(null);
 
   const fetchData = async () => {
     try {
       setIsLoading(true);
-      const data = await api.fetchClubs();
-      setClubs(data);
+      const [clubsData, tiersResponse] = await Promise.all([
+        api.fetchClubs(),
+        fetch('http://127.0.0.1:8000/tiers')
+      ]);
+      const tiersData = await tiersResponse.json();
+      setClubs(clubsData);
+      setTiers(tiersData.tiers);
+      if (tiersData.tiers?.length > 0) {
+        setNewClubTier(tiersData.tiers[0]);
+      }
     } catch(err) {
-      console.error("Failed to fetch clubs", err);
-      setError("Could not load clubs. Please ensure the backend server is running.");
+      console.error("Failed to fetch initial data", err);
+      setError("Could not load page data. Please ensure the backend server is running.");
     } finally {
       setIsLoading(false);
     }
@@ -42,7 +51,9 @@ export default function Clubs() {
       setClubs(prevClubs => [...prevClubs, newClub]);
       setIsCreateModalOpen(false);
       setNewClubName('');
-      setNewClubTier('Gold');
+      if (tiers.length > 0) {
+        setNewClubTier(tiers[0]);
+      }
     } catch (err) {
       alert("Failed to create club. A club with this name may already exist.");
       console.error(err);
@@ -82,10 +93,9 @@ export default function Clubs() {
               />
               <label htmlFor="clubTierSelect">Tier</label>
               <select id="clubTierSelect" value={newClubTier} onChange={(e) => setNewClubTier(e.target.value)}>
-                <option value="Gold">Gold</option>
-                <option value="Silver">Silver</option>
-                <option value="Bronze">Bronze</option>
-                <option value="Iron">Iron</option>
+                {tiers.map(tier => (
+                  <option key={tier} value={tier}>{tier}</option>
+                ))}
               </select>
             </div>
             <div className="modal-footer">

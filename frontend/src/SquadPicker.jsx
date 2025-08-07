@@ -32,6 +32,7 @@ const attributeMap = {
 export default function SquadPicker() {
   const [formations, setFormations] = useState([]);
   const [allRoles, setAllRoles] = useState([]);
+  const [allTiers, setAllTiers] = useState([]);
   const [selectedFormation, setSelectedFormation] = useState("");
   const [tier, setTier] = useState("Iron");
   const [authToken, setAuthToken] = useState("");
@@ -53,10 +54,18 @@ export default function SquadPicker() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const formList = await api.fetchFormations();
+        const [formList, rolesList, tiersResponse] = await Promise.all([
+          api.fetchFormations(),
+          api.fetchRoles(),
+          fetch('http://127.0.0.1:8000/tiers')
+        ]);
+        const tiersData = await tiersResponse.json();
         setFormations(formList?.formations ?? []);
-        const rolesList = await api.fetchRoles();
         setAllRoles(rolesList ?? []);
+        setAllTiers(tiersData.tiers ?? []);
+        if (!tiersData.tiers?.includes('Iron') && tiersData.tiers?.length > 0) {
+          setTier(tiersData.tiers[0]);
+        }
       } catch (err) { console.error("Failed to load initial data", err); }
     };
     fetchData();
@@ -190,7 +199,13 @@ export default function SquadPicker() {
           </label>
           <div style={{ display: "flex", gap: 16, alignItems: "center", justifyContent: "center", flexWrap: 'wrap' }}>
             <label>Formation:<select value={selectedFormation} onChange={handleFormationChange}><option value="">Select…</option>{formations.map((f) => (<option key={f} value={f}>{f}</option>))}</select></label>
-            <label>Tier:<select value={tier} onChange={(e) => setTier(e.target.value)}><option>Iron</option><option>Stone</option><option>Bronze</option><option>Silver</option><option>Gold</option><option>Platinum</option><option>Diamond</option></select></label>
+            <label>Tier:
+              <select value={tier} onChange={(e) => setTier(e.target.value)}>
+                {allTiers.map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </label>
           </div>
         </div>
       </section>

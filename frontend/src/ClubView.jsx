@@ -114,6 +114,7 @@ export default function ClubView() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // --- States for the Tactics Simulator ---
+  const [allTiers, setAllTiers] = useState([]);
   const [formations, setFormations] = useState([]);
   const [allRoles, setAllRoles] = useState([]);
   const [selectedFormation, setSelectedFormation] = useState("");
@@ -126,22 +127,34 @@ export default function ClubView() {
       setIsLoading(true);
       setError('');
 
-      // Fetch the single club with its full roster in one efficient call
-      const clubData = await api.fetchClubByName(clubName);
+      // Fetch all data concurrently for better performance
+      const [clubData, formList, rolesList, tiersResponse] = await Promise.all([
+        api.fetchClubByName(clubName),
+        api.fetchFormations(),
+        api.fetchRoles(),
+        fetch('http://127.0.0.1:8000/tiers')
+      ]);
+
+      const tiersData = await tiersResponse.json();
+      const availableTiers = tiersData.tiers ?? [];
+      setAllTiers(availableTiers);
 
       if (clubData) {
         const roster = clubData.roster || [];
         setRosterPlayers(roster);
         setRosterIds(roster.map(p => p.id));
-        setTier(clubData.tier || 'Iron'); // Use the club's actual tier
+        // Set the tier from the club, but validate it against the available tiers
+        if (clubData.tier && availableTiers.includes(clubData.tier)) {
+          setTier(clubData.tier);
+        } else if (availableTiers.length > 0) {
+          setTier(availableTiers[0]); // Default to the first available tier
+        }
       } else {
         setRosterPlayers([]);
         setRosterIds([]);
         setError(`Club "${clubName}" not found.`);
       }
 
-      // Fetch static data
-      const [formList, rolesList] = await Promise.all([api.fetchFormations(), api.fetchRoles()]);
       setFormations(formList?.formations ?? []);
       setAllRoles(rolesList ?? []);
     } catch(err) {
@@ -246,7 +259,13 @@ export default function ClubView() {
         <p>Test different formations and roles using only the players in this club's roster.</p>
         <div style={{ display: "flex", gap: 16, alignItems: "center", justifyContent: "center", flexWrap: 'wrap', marginBottom: '1rem' }}>
           <label>Formation:<select value={selectedFormation} onChange={handleFormationChange}><option value="">Select…</option>{formations.map((f) => (<option key={f} value={f}>{f}</option>))}</select></label>
-          <label>Tier:<select value={tier} onChange={(e) => setTier(e.target.value)}><option>Iron</option><option>Stone</option><option>Bronze</option><option>Silver</option><option>Gold</option><option>Platinum</option><option>Diamond</option></select></label>
+          <label>Tier:
+            <select value={tier} onChange={(e) => setTier(e.target.value)}>
+              {allTiers.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </label>
         </div>
         {Object.keys(roleMap).length > 0 && (
           <>

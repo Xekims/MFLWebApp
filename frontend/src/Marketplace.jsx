@@ -12,6 +12,7 @@ const defaultAttributeOrder = ['PAC', 'SHO', 'PAS', 'DRI', 'DEF', 'PHY', 'GK'];
 
 export default function Marketplace() {
   const [roles, setRoles] = useState([]);
+  const [allTiers, setAllTiers] = useState([]);
   const [selectedRole, setSelectedRole] = useState('');
   const [currentRoleDetails, setCurrentRoleDetails] = useState(null);
   const [authToken, setAuthToken] = useState('');
@@ -30,11 +31,20 @@ export default function Marketplace() {
   useEffect(() => {
     (async () => {
       try {
-        const rolesData = await api.fetchRoles();
+        const [rolesData, tiersResponse] = await Promise.all([
+          api.fetchRoles(),
+          fetch('http://127.0.0.1:8000/tiers')
+        ]);
+        const tiersData = await tiersResponse.json();
         setRoles(rolesData);
+        setAllTiers(tiersData.tiers ?? []);
+        // If the default 'Iron' isn't in the list, pick the first one.
+        if (!tiersData.tiers?.includes('Iron') && tiersData.tiers?.length > 0) {
+          setTier(tiersData.tiers[0]);
+        }
       } catch (err) {
-        console.error('Could not load roles.', err);
-        setError('Could not load roles.');
+        console.error('Could not load page data.', err);
+        setError('Could not load roles and tiers.');
       }
     })();
   }, []);
@@ -113,7 +123,11 @@ export default function Marketplace() {
           <label>Authentication Token:<input type="text" value={authToken} onChange={(e) => setAuthToken(e.target.value)} placeholder="Enter your Bearer Token here"/></label>
           <div style={{display: 'flex', gap: '15px'}}>
             <label style={{flex: 2}}>Select Role:<select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} style={{ width: '100%'}}><option value="">Select...</option>{roles.map(r => { const rN = r.RoleType || r.Role; return (<option key={rN} value={rN}>{rN} ({r.Position})</option>)})}</select></label>
-            <label style={{flex: 1}}>Tier:<select value={tier} onChange={(e) => setTier(e.target.value)} style={{ width: '100%'}}><option>Iron</option><option>Stone</option><option>Bronze</option><option>Silver</option><option>Gold</option><option>Platinum</option><option>Diamond</option></select></label>
+            <label style={{flex: 1}}>Tier:
+              <select value={tier} onChange={(e) => setTier(e.target.value)} style={{ width: '100%'}}>
+                {allTiers.map(t => (<option key={t} value={t}>{t}</option>))}
+              </select>
+            </label>
           </div>
           <button type="submit" disabled={isLoading}>{isLoading ? 'Searching...' : 'Search Market'}</button>
         </form>
