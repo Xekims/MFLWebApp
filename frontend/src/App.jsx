@@ -13,14 +13,14 @@ export default function App() {
     <>
       <div className="sidebar">
         <div className="sidebar-header">
-          <h3>MFL Game</h3>
+          <h3>XekiMFL Toolset</h3>
         </div>
         <nav>
-          <NavLink to="/"><span>&#9876;</span> Squad Picker</NavLink>
-          <NavLink to="/market"><span>&#128721;</span> Marketplace</NavLink>
-          <NavLink to="/agency"><span>&#128100;</span> My Agency</NavLink>
-          <NavLink to="/clubs"><span>&#127946;</span> Clubs</NavLink>
-          <NavLink to="/config"><span>&#9881;</span> Config</NavLink>
+          {/*<NavLink to="/"><span><i className="fa-solid fa-users-line"></i></span> Squad Picker</NavLink>*/}
+          <NavLink to="/market"><span><i className="fa-solid fa-store"></i></span> Marketplace</NavLink>
+          <NavLink to="/agency"><span><i className="fa-solid fa-building-columns"></i></span> My Agency</NavLink>
+          <NavLink to="/clubs"><span><i className="fa-solid fa-trophy"></i></span> My Clubs</NavLink>
+          <NavLink to="/config"><span><i className="fa-solid fa-gear"></i></span> Config</NavLink>
         </nav>
       </div>
       <div className="main-content">
