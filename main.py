@@ -61,6 +61,10 @@ class Club(BaseModel):
     club_name: str
     tier: str = "Iron"
     roster: List[int] = []
+class PlayerAssignmentRequest(BaseModel):
+    player_id: int
+    old_club_name: str
+    new_club_name: str
 
 # --- Data Fetch & Scoring ---
 def fetch_players_by_ids(player_ids: List[int]) -> pd.DataFrame:
@@ -197,9 +201,9 @@ def search_market(req: MarketSearchRequest):
     role = ROLE_LOOKUP.get(role_key)
     if not role: raise HTTPException(status_code=404, detail="Role not found")
     params = {"limit": 25, "type": "PLAYER", "status": "AVAILABLE", "view": "full"}
-    required_position = role.get("Position")
-    if required_position: params["positions"] = required_position
-    thresholds = TIER_THRESH["Iron"]
+    if required_position := role.get("Position"):
+        params["positions"] = required_position
+    thresholds = TIER_THRESH.get(req.tier, TIER_THRESH["Iron"])
     for i, attr_field in enumerate(["Attribute1", "Attribute2", "Attribute3", "Attribute4"]):
         code = (role.get(attr_field) or "").strip().upper()
         if not code: continue
@@ -259,6 +263,39 @@ def get_players_by_ids(req: PlayerIdsRequest):
     if players_df.empty:
         return []
     return json.loads(players_df.to_json(orient="records"))
+@app.post("/players/assign")
+def assign_player_club(req: PlayerAssignmentRequest):
+    squads = load_squads()
+
+    def get_roster(club_name):
+        if club_name not in squads: return None
+        club_data = squads[club_name]
+        if isinstance(club_data, dict): return club_data.get("roster", [])
+        elif isinstance(club_data, list): return club_data
+        return None
+
+    def update_roster(club_name, new_roster):
+        if club_name not in squads: return
+        club_data = squads[club_name]
+        if isinstance(club_data, dict): club_data["roster"] = new_roster
+        elif isinstance(club_data, list): squads[club_name] = new_roster
+
+    # Remove from old club
+    if req.old_club_name != "Unassigned":
+        old_roster = get_roster(req.old_club_name)
+        if old_roster is not None and req.player_id in old_roster:
+            old_roster.remove(req.player_id)
+            update_roster(req.old_club_name, old_roster)
+
+    # Add to new club
+    if req.new_club_name != "Unassigned":
+        new_roster = get_roster(req.new_club_name)
+        if new_roster is not None and req.player_id not in new_roster:
+            new_roster.append(req.player_id)
+            update_roster(req.new_club_name, new_roster)
+
+    save_squads(squads)
+    return {"message": f"Player {req.player_id} assignment updated."}
 @app.post("/squads/simulate")
 def simulate_squad(req: SimulationRequest):
     players_df = fetch_players_by_ids(req.player_ids)
@@ -324,6 +361,8 @@ def create_club(club: Club):
     clubs = load_squads()
     if club.club_name in clubs:
         raise HTTPException(status_code=400, detail="A club with this name already exists.")
+    # Use the data from the request body, including the tier,
+    # instead of a hardcoded value.
     clubs[club.club_name] = club.dict()
     save_squads(clubs)
     return club

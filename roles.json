@@ -27,7 +27,7 @@
   { "Role": "Regista", "Attribute1": "PAS", "Attribute2": "DRI", "Attribute3": "PAC", "Attribute4": "DEF", "Position": "CDM" },
   { "Role": "Roaming Playmaker (CM)", "Attribute1": "DRI", "Attribute2": "PAS", "Attribute3": "PAC", "Attribute4": "SHO", "Position": "CM" },
   { "Role": "Roaming Playmaker (CDM)", "Attribute1": "DRI", "Attribute2": "PAS", "Attribute3": "PAC", "Attribute4": "SHO", "Position": "CDM" },
-  { "Role": "Segundo Volante", "Attribute1": "PHY", "Attribute2": "SHO", "Attribute3": "PAC", "Attribute4": "DEF", "Position": "CDM" },
+  { "Role": "Segundo Volante", "Attribute1": "PHY", "Attribute2": "DRI", "Attribute3": "DEF", "Attribute4": "SHO", "Position": "CDM" },
   { "Role": "Central Midfielder", "Attribute1": "PAS", "Attribute2": "PHY", "Attribute3": "DEF", "Attribute4": "DRI", "Position": "CM" },
   { "Role": "Box-to-Box Midfielder", "Attribute1": "PHY", "Attribute2": "PAS", "Attribute3": "DRI", "Attribute4": "DEF", "Position": "CM" },
   { "Role": "Advanced Playmaker (CM)", "Attribute1": "PAS", "Attribute2": "DRI", "Attribute3": "PAC", "Attribute4": "SHO", "Position": "CM" },

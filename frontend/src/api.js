@@ -90,11 +90,11 @@ export async function fetchClubs() {
   return res.json();
 }
 
-export async function createClub(clubName) {
+export async function createClub(clubName, tier) {
   const res = await fetch(`${API_URL}/clubs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ club_name: clubName, roster: [] }),
+    body: JSON.stringify({ club_name: clubName, tier: tier, roster: [] }),
   });
   if (!res.ok) throw new Error('Failed to create club');
   return res.json();
@@ -199,4 +199,17 @@ export async function deleteClub(clubName) {
   }
   // The backend returns a success message which we can return or ignore
   return response.json();
+}
+// This function should be added to your api.js file
+export async function updatePlayerAssignment(assignmentData) {
+  const response = await fetch(`${API_URL}/players/assign`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(assignmentData),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(errorData.detail || 'Failed to assign player');
+  }
+  return await response.json();
 }

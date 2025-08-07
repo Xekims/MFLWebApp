@@ -125,7 +125,7 @@ export default function Clubs() {
       )}
 
       <section>
-        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+        <div className="page-header">
             <h1>My Clubs</h1>
             <button onClick={() => setIsCreateModalOpen(true)}>Create New Club</button>
         </div>
@@ -133,50 +133,28 @@ export default function Clubs() {
         
         {isLoading && <p>Loading clubs...</p>}
 
-        {error && <p style={{color: 'var(--mikado-yellow)'}}>{error}</p>}
+        {error && <p className="error-message">{error}</p>}
         
         {!isLoading && !error && (
           clubs.length > 0 ? (
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem', marginTop: '2rem'}}>
+            <div className="club-grid">
               {clubs.map((club) => (
                 <Link
                   to={`/clubs/${encodeURIComponent(club.club_name)}`}
                   key={club.club_name}
-                  style={{
-                    backgroundColor: 'var(--rich-black)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '8px',
-                    padding: '1.5rem',
-                    textDecoration: 'none',
-                    color: 'inherit',
-                    display: 'block',
-                    transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-                  }}
-                  onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 10px 20px rgba(0,0,0,0.3)'; }}
-                  onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0px)'; e.currentTarget.style.boxShadow = 'none'; }}
+                  className="club-card"
                 >
-                  <h3 style={{margin: 0, color: 'var(--gold)'}}>{club.club_name}</h3>
-                  <p style={{margin: '0.5rem 0 1rem 0', color: 'var(--text-secondary)'}}>
-                    {(club.roster || []).length} Players in Roster
-                  </p>
-                  <span style={{
-                      display: 'inline-block',
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: '12px',
-                      backgroundColor: `var(--${(club.tier || 'iron').toLowerCase()}-tier-bg, var(--yale-blue))`,
-                      color: `var(--${(club.tier || 'iron').toLowerCase()}-tier-text, var(--text-primary))`,
-                      fontSize: '0.8rem',
-                      fontWeight: 'bold'
-                  }}>{club.tier}</span>
-                  <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', textAlign: 'right' }}>
+                  <h3>{club.club_name}</h3>
+                  <p>{(club.roster || []).length} Players in Roster</p>
+                  <span className={`tier-badge tier-${(club.tier || 'iron').toLowerCase()}`}>{club.tier}</span>
+                  <div className="club-card-footer">
                     <button
-                      className="button-danger"
+                      className="button-danger button-sm"
                       onClick={(e) => {
-                        e.preventDefault(); // Prevent the <Link> from navigating
+                        e.preventDefault();
                         e.stopPropagation();
                         setClubToDelete(club);
                       }}
-                      style={{padding: '0.5rem 1rem', fontSize: '0.9rem'}}
                     >
                       Delete
                     </button>

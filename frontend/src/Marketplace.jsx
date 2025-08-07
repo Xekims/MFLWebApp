@@ -10,6 +10,24 @@ const attributeMap = {
 };
 const defaultAttributeOrder = ['PAC', 'SHO', 'PAS', 'DRI', 'DEF', 'PHY', 'GK'];
 
+const getAttributeStyle = (value) => {
+  let backgroundColor, color;
+  if (value >= 95) { backgroundColor = '#000814'; color = '#ffc300'; }
+  else if (value >= 85) { backgroundColor = '#7209b7'; color = '#fffffc'; }
+  else if (value >= 75) { backgroundColor = '#00296b'; color = '#fffffc'; }
+  else if (value >= 65) { backgroundColor = '#386641'; color = '#000814'; }
+  else if (value >= 55) { backgroundColor = '#ffc300'; color = '#000814'; }
+  else { backgroundColor = '#f2e9e4'; color = '#000814'; }
+  return { backgroundColor, color, fontWeight: 'bold', textAlign: 'center', borderRadius: '4px', padding: '2px 6px' };
+};
+
+const StatDisplay = ({ label, value }) => (
+  <div>
+    <strong style={getAttributeStyle(value)}>{value}</strong>
+    <span>{label}</span>
+  </div>
+);
+
 export default function Marketplace() {
   const [roles, setRoles] = useState([]);
   const [allTiers, setAllTiers] = useState([]);
@@ -24,7 +42,8 @@ export default function Marketplace() {
   const [analyzedPlayer, setAnalyzedPlayer] = useState(null);
   const [analysisData, setAnalysisData] = useState(null);
   const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
-  const [analysisError, setAnalysisError] = useState(''); // State for modal errors
+  const [analysisError, setAnalysisError] = useState('');
+  const [analysisTier, setAnalysisTier] = useState('Iron');
 
   const [attributeOrder, setAttributeOrder] = useState(defaultAttributeOrder);
 
@@ -37,10 +56,11 @@ export default function Marketplace() {
         ]);
         const tiersData = await tiersResponse.json();
         setRoles(rolesData);
-        setAllTiers(tiersData.tiers ?? []);
-        // If the default 'Iron' isn't in the list, pick the first one.
-        if (!tiersData.tiers?.includes('Iron') && tiersData.tiers?.length > 0) {
-          setTier(tiersData.tiers[0]);
+        const tiers = tiersData.tiers ?? [];
+        setAllTiers(tiers);
+        if (!tiers.includes('Iron') && tiers.length > 0) {
+          setTier(tiers[0]);
+          setAnalysisTier(tiers[0]);
         }
       } catch (err) {
         console.error('Could not load page data.', err);
@@ -89,20 +109,33 @@ export default function Marketplace() {
   const handleSortByPrice = () => setResults([...results].sort((a, b) => a.price - b.price));
   const handleSortByFitScore = () => setResults([...results].sort((a, b) => b.player.metadata.fit_score - a.player.metadata.fit_score));
 
-  const handlePlayerClick = async (playerListing) => {
+  const handlePlayerClick = (playerListing) => {
     if (!playerListing.player?.id) return;
+    setAnalysisTier(tier); // Set initial tier from search
+    setAnalyzedPlayer(playerListing.player);
+    fetchAnalysis(playerListing.player.id, tier);
+  };
+
+  const fetchAnalysis = async (playerId, tierToAnalyze) => {
     setIsAnalysisLoading(true);
     setAnalysisError('');
-    setAnalyzedPlayer(playerListing.player);
     setAnalysisData(null);
     try {
-      const data = await api.fetchPlayerAnalysis(playerListing.player.id, tier);
+      const data = await api.fetchPlayerAnalysis(playerId, tierToAnalyze);
       setAnalysisData(data);
     } catch (err) {
       console.error("Player analysis failed:", err);
       setAnalysisError("Could not load player analysis. The player may no longer be available.");
     } finally {
       setIsAnalysisLoading(false);
+    }
+  };
+
+  const handleTierChange = (e) => {
+    const newTier = e.target.value;
+    setAnalysisTier(newTier);
+    if (analyzedPlayer) {
+      fetchAnalysis(analyzedPlayer.id, newTier);
     }
   };
 
@@ -175,43 +208,49 @@ export default function Marketplace() {
         </section>
       )}
 
-      {/* --- CORRECTED MODAL LOGIC --- */}
       {analyzedPlayer && (
         <div className="modal-overlay" onClick={() => setAnalyzedPlayer(null)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close-btn" onClick={() => setAnalyzedPlayer(null)}>X</button>
             
-            {isAnalysisLoading && <div style={{padding: '4rem', textAlign: 'center'}}>Loading analysis...</div>}
-            
-            {analysisError && <div style={{padding: '4rem', textAlign: 'center', color: 'var(--mikado-yellow)'}}>{analysisError}</div>}
-
-            {!isAnalysisLoading && !analysisError && analysisData && (
-              <div className="modal-content">
+            <div className="modal-content">
+              {analysisData && analysisData.player_attributes && (
                 <div className="player-stat-card">
                   <div className="overall">{analysisData.player_attributes.overall}</div>
                   <h3>{analysisData.player_attributes.firstName} {analysisData.player_attributes.lastName}</h3>
                   <p>Age: {analysisData.player_attributes.age} &nbsp;&bull;&nbsp; {analysisData.player_attributes.positions.join(', ')}</p>
                   <div className="player-stat-grid">
-                    <div><strong>{analysisData.player_attributes.pace}</strong> <span>Pace</span></div>
-                    <div><strong>{analysisData.player_attributes.shooting}</strong> <span>Shooting</span></div>
-                    <div><strong>{analysisData.player_attributes.passing}</strong> <span>Passing</span></div>
-                    <div><strong>{analysisData.player_attributes.dribbling}</strong> <span>Dribbling</span></div>
-                    <div><strong>{analysisData.player_attributes.defense}</strong> <span>Defense</span></div>
-                    <div><strong>{analysisData.player_attributes.physical}</strong> <span>Physical</span></div>
+                    <StatDisplay label="Pace" value={analysisData.player_attributes.pace} />
+                    <StatDisplay label="Shooting" value={analysisData.player_attributes.shooting} />
+                    <StatDisplay label="Passing" value={analysisData.player_attributes.passing} />
+                    <StatDisplay label="Dribbling" value={analysisData.player_attributes.dribbling} />
+                    <StatDisplay label="Defense" value={analysisData.player_attributes.defense} />
+                    <StatDisplay label="Physical" value={analysisData.player_attributes.physical} />
                   </div>
                 </div>
-                <div className="role-analysis">
-                  <h4>Role Analysis (Tier: {tier})</h4>
-                  <p><strong>Best Role:</strong> {analysisData.best_role.role} <span>({analysisData.best_role.score})</span></p>
-                  <h5>All Positive Roles:</h5>
-                  <ul>
-                    {analysisData.positive_roles.map(r => (
-                      <li key={r.role}>{r.role} <span>{r.score} ({r.label})</span></li>
-                    ))}
-                  </ul>
+              )}
+              <div className="role-analysis">
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                  <h4>Role Analysis</h4>
+                  <select value={analysisTier} onChange={handleTierChange}>
+                    {allTiers.map(t => (<option key={t} value={t}>{t}</option>))}
+                  </select>
                 </div>
+                {isAnalysisLoading && <div style={{padding: '2rem', textAlign: 'center'}}>Loading...</div>}
+                {analysisError && <div style={{padding: '2rem', textAlign: 'center', color: 'var(--mikado-yellow)'}}>{analysisError}</div>}
+                {!isAnalysisLoading && !analysisError && analysisData && (
+                  <>
+                    <p><strong>Best Role:</strong> {analysisData.best_role.role} <span>({analysisData.best_role.score})</span></p>
+                    <h5>All Positive Roles:</h5>
+                    <ul>
+                      {analysisData.positive_roles.map(r => (
+                        <li key={r.role}>{r.role} <span>{r.score} ({r.label})</span></li>
+                      ))}
+                    </ul>
+                  </>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
       )}

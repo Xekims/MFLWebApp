@@ -1,230 +1,355 @@
 /* file: frontend/src/index.css */
 
-/* --- 1. COLOR PALETTE & GLOBAL SETUP --- */
+/* --- 1. THEME & COLOR PALETTE --- */
 :root {
-  --rich-black: #000814;
-  --oxford-blue: #001d3d;
-  --yale-blue: #003566;
-  --mikado-yellow: #ffc300;
-  --gold: #ffd60a;
-  --text-primary: #e2e8f0;
-  --text-secondary: #94a3b8;
-  --border-color: rgba(0, 53, 102, 0.5);
+  --background-main: #040f16;
+  --background-secondary: #0d1317;
+  --background-tertiary: #1b263b;
+  --text-primary: #c1dff0;
+  --text-secondary: #f8f9fb;
+  --accent-primary: #033860;
+  --accent-primary-hover: #001242;
+  --border-color: #000022;
 }
-/* ... (Global Styles, Typography, Navigation, Forms, Tables sections remain the same) ... */
-body { margin: 0; font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif; background-color: var(--rich-black); color: var(--text-primary); min-height: 100vh; }
-#root { max-width: 1280px; margin: 0 auto; padding: 2rem; width: 100%; }
-section { background-color: var(--oxford-blue); border: 1px solid var(--border-color); padding: 1.5rem 2rem; border-radius: 12px; }
-form { border: 1px solid var(--border-color) !important; background-color: transparent !important; }
-h1, h2, h3 { color: var(--mikado-yellow); font-weight: 700; margin-top: 0; }
-h1 { font-size: 3em; line-height: 1.1; text-align: center; margin-bottom: 2rem; }
-h2 { font-size: 1.75em; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1.5rem; }
-p { color: var(--text-secondary); }
-a { color: var(--gold); text-decoration: inherit; font-weight: 500; transition: color 0.2s; }
-a:hover { color: var(--mikado-yellow); }
-nav { display: flex; justify-content: center; gap: 2rem; padding: 1rem 0; border: none !important; border-bottom: 1px solid var(--border-color) !important; }
-nav a { font-size: 1em; padding: 0.5rem 1rem; border-radius: 8px; transition: background-color 0.2s; }
-nav a:hover { background-color: rgba(0, 29, 61, 0.7); }
-button, select, input { border-radius: 8px; border: 1px solid var(--yale-blue); padding: 0.8em 1.2em; font-size: 1em; font-weight: 500; font-family: inherit; background-color: var(--oxford-blue); color: var(--text-primary); cursor: pointer; transition: all 0.2s; }
-button:hover, select:hover, input:hover { border-color: var(--gold); }
-input:focus, select:focus { outline: 2px solid var(--mikado-yellow); outline-offset: 2px; }
-button { background-color: var(--yale-blue); color: var(--gold); font-weight: 700; }
-button:hover { background-color: var(--gold); color: var(--rich-black); }
-select option { background-color: var(--oxford-blue); color: var(--text-primary); }
-label { display: flex; flex-direction: column; gap: 0.5rem; font-weight: 500; color: var(--text-secondary); }
-table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; font-size: 0.9em; }
-thead { background: none; }
-th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border-color); }
-th { font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.8em; letter-spacing: 0.05em; }
-tbody tr { transition: background-color 0.2s; }
-tbody tr:hover { background-color: rgba(0, 29, 61, 0.5); }
 
+/* --- 2. GLOBAL STYLES & TYPOGRAPHY --- */
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--background-main);
+  color: var(--text-primary);
+  line-height: 1.6;
+}
 
-/* --- 7. PLAYER CARD MODAL (UPDATED & FIXED) --- */
+#root {
+  display: flex;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+h1 { font-size: 2.25rem; }
+h2 { font-size: 1.75rem; }
+h3 { font-size: 1.25rem; }
+
+p, li, span, label {
+  color: var(--text-secondary);
+}
+
+a {
+  color: var(--accent-primary);
+  text-decoration: none;
+  transition: color 0.2s ease-in-out;
+}
+
+a:hover {
+  color: var(--accent-primary-hover);
+}
+
+/* --- 3. LAYOUT & NAVIGATION --- */
+.sidebar {
+  width: 240px;
+  background-color: var(--background-secondary);
+  padding: 1.5rem;
+  border-right: 1px solid var(--border-color);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-header {
+  padding-bottom: 1.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-header h3 {
+  text-align: center;
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--text-primary);
+}
+
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sidebar nav a {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.sidebar nav a:hover, .sidebar nav a.active {
+  background-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.sidebar nav a span {
+  font-size: 1.2rem;
+}
+
+.main-content {
+  flex-grow: 1;
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* --- 4. COMPONENTS --- */
+
+/* Buttons */
+button {
+  background-color: var(--accent-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--accent-primary);
+  border-radius: 6px;
+  padding: 0.6rem 1.2rem;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+button:hover {
+  background-color: var(--accent-primary-hover);
+  border-color: var(--accent-primary-hover);
+}
+
+button.button-danger {
+    background-color: #e53e3e;
+    border-color: #e53e3e;
+}
+
+button.button-danger:hover {
+    background-color: #c53030;
+    border-color: #c53030;
+}
+
+.button-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+}
+
+/* Cards & Panels */
+section {
+  background-color: var(--background-secondary);
+  border: 1px solid var(--border-color);
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+/* Forms & Inputs */
+input, select, textarea {
+  background-color: var(--background-main);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-primary-hover);
+}
+
+label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1.5rem;
+}
+
+thead {
+  background-color: var(--background-tertiary);
+}
+
+th, td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+th {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+tbody tr:hover {
+  background-color: var(--background-tertiary);
+}
+
+/* --- 5. MODAL STYLES --- */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 8, 20, 0.8); /* --rich-black with transparency */
+  background-color: rgba(10, 10, 10, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  backdrop-filter: blur(5px);
+  backdrop-filter: blur(4px);
 }
 
-.modal-card {
-  background-color: var(--oxford-blue);
-  padding: 0; /* Remove padding to allow content to go edge-to-edge */
-  border-radius: 12px;
-  border: 1px solid var(--yale-blue);
+.modal-card, .modal {
+  background-color: var(--background-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
   width: 90%;
   max-width: 850px;
-  position: relative;
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-  overflow: hidden; /* Hide anything that spills out */
+  overflow: hidden;
 }
 
 .modal-close-btn {
   position: absolute;
-  top: 15px;
-  right: 15px;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  z-index: 10;
+  top: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+  cursor: pointer;
 }
 
 .modal-content {
   display: flex;
-  flex-direction: row; /* Changed from column to row */
-  gap: 0; /* No gap as columns will touch */
 }
 
-/* --- NEW: Styles for the redesigned card --- */
 .player-stat-card {
   flex-basis: 320px;
   flex-shrink: 0;
-  background: linear-gradient(165deg, var(--yale-blue) 0%, var(--oxford-blue) 100%);
+  background: var(--background-tertiary);
   padding: 2rem;
   text-align: center;
 }
 
 .player-stat-card .overall {
-  font-size: 4.5em;
-  font-weight: 900;
-  color: var(--mikado-yellow);
-  line-height: 1;
-  border-bottom: 2px solid var(--border-color);
-  padding-bottom: 1rem;
-  margin-bottom: 1rem;
-}
-
-.player-stat-card h3 {
-  margin: 0;
-  font-size: 1.8em;
+  font-size: 4rem;
+  font-weight: 700;
   color: var(--text-primary);
-}
-
-.player-stat-card p {
-  margin: 0;
-  color: var(--text-secondary);
+  margin-bottom: 1rem;
 }
 
 .player-stat-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
-  margin-top: 2rem;
-  text-align: left;
+  gap: 1rem;
+  margin-top: 1.5rem;
 }
 
-.player-stat-grid div strong {
-  font-size: 1.5em;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.player-stat-grid div span {
-  font-size: 0.9em;
-  color: var(--text-secondary);
-  text-transform: uppercase;
+.player-stat-grid div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .role-analysis {
   flex-grow: 1;
   padding: 2rem;
-  background-color: var(--oxford-blue);
 }
 
-.role-analysis h4 {
-  margin-top: 0;
-  color: var(--gold);
-  border-bottom: 1px solid var(--border-color);
-  padding-bottom: 0.5rem;
-  margin-bottom: 1rem;
+/* --- 6. CLUB-SPECIFIC STYLES --- */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
 }
 
-.role-analysis ul {
-  list-style-type: none;
-  padding: 0;
-  max-height: 300px;
-  overflow-y: auto;
+.club-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-top: 2rem;
 }
 
-.role-analysis li {
-  padding: 6px 0;
-  display: flex;
-  justify-content: space-between;
+.club-card {
+    background-color: var(--background-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
 }
 
-.role-analysis li span {
-  background-color: rgba(0, 53, 102, 0.5); /* Semi-transparent Yale Blue */
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 0.9em;
+.club-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.3);
 }
 
-/* --- 8. STYLES FOR CUSTOM DIALOG/PROMPT --- */
-/* Refactored to be a more generic and reusable modal system */
-.modal {
-  background-color: var(--oxford-blue);
-  border-radius: 12px;
-  border: 1px solid var(--yale-blue);
-  width: 90%;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden; /* Ensures children conform to border-radius */
-  max-height: 80vh;
+.club-card h3 {
+    margin: 0;
+    color: var(--text-primary);
 }
 
-.modal-header {
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid var(--border-color);
-  flex-shrink: 0;
+.club-card p {
+    margin: 0.5rem 0 1rem 0;
+    color: var(--text-secondary);
+    flex-grow: 1;
 }
 
-.modal-header h3 {
-  margin-top: 0;
-  margin-bottom: 0;
-  color: var(--gold);
-  font-size: 1.5em;
+.tier-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    align-self: flex-start;
 }
 
-.modal-body {
-  padding: 1.5rem;
-  overflow-y: auto; /* Allows content like long tables to scroll */
+.tier-diamond { background-color: #0081b8; color: #000814; }
+.tier-platinum { background-color: #a2f0e2; color: #000814; }
+.tier-gold { background-color: #d4af37; color: #000814; }
+.tier-silver { background-color: #949fa6; color: #000814; }
+.tier-bronze { background-color: #9d7845; color: #000814; }
+.tier-iron { background-color: #66615c; color: #000814; }
+.tier-stone { background-color: #ebe2c4; color: #000814; }
+.tier-ice { background-color: #9cb2be; color: #000814; }
+.tier-spark { background-color: #ffb136; color: #000814; }
+.tier-flint { background-color: #757061; color: #000814; }
+
+.club-card-footer {
+    margin-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    padding-top: 1rem;
+    text-align: right;
 }
 
-.modal-body p {
-  color: var(--text-secondary);
-  margin-top: 0;
+.error-message {
+    color: #e53e3e;
 }
-
-.modal-body input,
-.modal-body select {
-  width: 100%;
-  box-sizing: border-box; /* Ensures padding doesn't affect width */
-  margin-top: 0.5rem;
-  margin-bottom: 1rem;
-}
-
-.modal-footer {
-  padding: 1rem 1.5rem;
-  border-top: 1px solid var(--border-color);
-  display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
-  background-color: rgba(0, 8, 20, 0.5); /* Slightly darker footer for emphasis */
-}
-
-/* Sizing classes for different modal types */
-.modal.modal-sm { max-width: 500px; }
-.modal.modal-md { max-width: 700px; }
-.modal.modal-lg { max-width: 950px; }
