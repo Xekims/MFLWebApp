@@ -33,6 +33,7 @@ export default function PlayerSearch() {
   const [error, setError] = useState('');
   const [allTiers, setAllTiers] = useState([]);
   const [selectedTier, setSelectedTier] = useState('Iron'); // Default to 'Iron' or first available tier
+  const [isNewPlayerSearch, setIsNewPlayerSearch] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -60,15 +61,16 @@ export default function PlayerSearch() {
       const data = await api.fetchPlayerAnalysis(idToSearch); // Correctly calls backend without tier
       if (data) {
         setPlayerData(data);
-        // --- CRITICAL SECTION FOR BUG 1 ---
-        // Set initial selectedTier to the highest tier with a positive fit score
-        if (data.overall_best_role) {
-          setSelectedTier(data.overall_best_role.tier);
-        } else if (allTiers.length > 0) {
-          // If no overall best role, default to the first available tier (e.g., "Iron")
-          // but only if the current selectedTier is not already a valid tier
-          if (!allTiers.includes(selectedTier)) {
+        if (!playerData) { // Check if playerData is null before setting it
+          console.log('Initial player search. Attempting to set selectedTier.');
+          if (data.overall_best_role) {
+            console.log('overall_best_role:', data.overall_best_role);
+            setSelectedTier(data.overall_best_role.tier);
+            console.log('selectedTier set to (from overall_best_role):', data.overall_best_role.tier);
+          } else if (allTiers.length > 0) {
+            console.log('No overall_best_role. Setting selectedTier to allTiers[0]:', allTiers[0]);
             setSelectedTier(allTiers[0]);
+            console.log('selectedTier set to (from allTiers[0]):', allTiers[0]);
           }
         }
       } else {

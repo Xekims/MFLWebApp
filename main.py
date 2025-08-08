@@ -177,9 +177,11 @@ def get_player_analysis(player_id: int):
         
         if positive_roles_for_tier:
             all_positive_roles_by_tier[tier_name] = positive_roles_for_tier
-            # Check if the best role for this tier is the overall best
-            if positive_roles_for_tier[0]["score"] > overall_best_score:
-                overall_best_score = positive_roles_for_tier[0]["score"]
+            # If we find positive roles in this tier, and it's the first time we're finding
+            # positive roles in a tier (because we iterate from highest to lowest),
+            # then this tier's best role is the overall best.
+            # We only set overall_best_role once, for the highest tier with a positive score.
+            if overall_best_role is None: # Only set if not already set by a higher tier
                 overall_best_role = positive_roles_for_tier[0]
 
     return {
