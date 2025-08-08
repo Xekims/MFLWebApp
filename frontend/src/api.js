@@ -1,6 +1,7 @@
 // file: frontend/src/api.js
 
 const API_URL = "http://localhost:8000";
+const EXTERNAL_API_URL = "https://z519wdyajg.execute-api.us-east-1.amazonaws.com/prod";
 
 // --- Core Fetch Functions ---
 

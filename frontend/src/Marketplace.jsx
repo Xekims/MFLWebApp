@@ -50,11 +50,10 @@ export default function Marketplace() {
   useEffect(() => {
     (async () => {
       try {
-        const [rolesData, tiersResponse] = await Promise.all([
+        const [rolesData, tiersData] = await Promise.all([
           api.fetchRoles(),
           fetch('http://127.0.0.1:8000/tiers').then(res => res.json())
         ]);
-        const tiersData = await tiersResponse.json();
         setRoles(rolesData);
         const tiers = tiersData.tiers ?? [];
         setAllTiers(tiers);

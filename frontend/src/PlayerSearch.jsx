@@ -33,7 +33,6 @@ export default function PlayerSearch() {
   const [error, setError] = useState('');
   const [allTiers, setAllTiers] = useState([]);
   const [selectedTier, setSelectedTier] = useState('Iron'); // Default to 'Iron' or first available tier
-  const [isNewPlayerSearch, setIsNewPlayerSearch] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -58,20 +57,13 @@ export default function PlayerSearch() {
     setError('');
     setPlayerData(null);
     try {
-      const data = await api.fetchPlayerAnalysis(idToSearch); // Correctly calls backend without tier
+      const data = await api.fetchPlayerAnalysis(idToSearch, selectedTier);
       if (data) {
         setPlayerData(data);
-        if (!playerData) { // Check if playerData is null before setting it
-          console.log('Initial player search. Attempting to set selectedTier.');
-          if (data.overall_best_role) {
-            console.log('overall_best_role:', data.overall_best_role);
-            setSelectedTier(data.overall_best_role.tier);
-            console.log('selectedTier set to (from overall_best_role):', data.overall_best_role.tier);
-          } else if (allTiers.length > 0) {
-            console.log('No overall_best_role. Setting selectedTier to allTiers[0]:', allTiers[0]);
-            setSelectedTier(allTiers[0]);
-            console.log('selectedTier set to (from allTiers[0]):', allTiers[0]);
-          }
+        if (data.overall_best_role) {
+          setSelectedTier(data.overall_best_role.tier);
+        } else if (allTiers.length > 0) {
+          setSelectedTier(allTiers[0]);
         }
       } else {
         setError('Player not found.');
@@ -94,7 +86,7 @@ export default function PlayerSearch() {
     if (playerId && allTiers.length > 0) { // Only search if playerId and tiers are loaded
       searchForPlayer(playerId);
     }
-  }, [playerId, allTiers]); // Removed selectedTier from dependencies
+  }, [playerId, allTiers, selectedTier]); // Added selectedTier to dependencies
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -109,16 +101,13 @@ export default function PlayerSearch() {
   const handleTierChange = (e) => {
     const newTier = e.target.value;
     setSelectedTier(newTier);
-    // Explicitly call searchForPlayer with the new tier
-    if (playerId) {
-      searchForPlayer(playerId); // searchForPlayer will now use the updated selectedTier from state
-    }
+    // searchForPlayer will be triggered by the useEffect due to selectedTier change
   };
 
   const radarChartData = useMemo(() => {
     if (!playerData) return { labels: [], datasets: [] };
 
-    const attributes = playerData.player_attributes;
+    const attributes = playerData;
     const dataValues = [
       attributes.pace,
       attributes.shooting,
@@ -260,7 +249,7 @@ export default function PlayerSearch() {
                   {playerData.all_positive_roles_by_tier[selectedTier]
                     .filter(role => !(playerData.overall_best_role && role.role === playerData.overall_best_role.role && role.tier === playerData.overall_best_role.tier)) // Exclude overall_best_role if it's already displayed
                     .map((role, index) => (
-                      <li key={index}>{role.role} (Score: {role.score}, {role.label})</li>
+                      <li key={index}>{role.role} ({role.label})</li>
                     ))}
                 </ul>
               ) : (
