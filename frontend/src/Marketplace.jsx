@@ -52,7 +52,7 @@ export default function Marketplace() {
       try {
         const [rolesData, tiersResponse] = await Promise.all([
           api.fetchRoles(),
-          fetch('http://127.0.0.1:8000/tiers')
+          fetch('http://127.0.0.1:8000/tiers').then(res => res.json())
         ]);
         const tiersData = await tiersResponse.json();
         setRoles(rolesData);
@@ -135,6 +135,7 @@ export default function Marketplace() {
     const newTier = e.target.value;
     setAnalysisTier(newTier);
     if (analyzedPlayer) {
+      setAnalysisData(null);
       fetchAnalysis(analyzedPlayer.id, newTier);
     }
   };
@@ -155,7 +156,7 @@ export default function Marketplace() {
         <form onSubmit={handleSearch} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           <label>Authentication Token:<input type="text" value={authToken} onChange={(e) => setAuthToken(e.target.value)} placeholder="Enter your Bearer Token here"/></label>
           <div style={{display: 'flex', gap: '15px'}}>
-            <label style={{flex: 2}}>Select Role:<select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} style={{ width: '100%'}}><option value="">Select...</option>{roles.map(r => { const rN = r.RoleType || r.Role; return (<option key={rN} value={rN}>{rN} ({r.Position})</option>)})}</select></label>
+            <label style={{flex: 2}}>Select Role:<select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} style={{ width: '100%'}}><option value="">Select...</option>{roles.map(r => { const rN = r.RoleType || r.Role; return (<option key={rN} value={rN}>{rN}</option>)})}</select></label>
             <label style={{flex: 1}}>Tier:
               <select value={tier} onChange={(e) => setTier(e.target.value)} style={{ width: '100%'}}>
                 {allTiers.map(t => (<option key={t} value={t}>{t}</option>))}
@@ -240,7 +241,11 @@ export default function Marketplace() {
                 {analysisError && <div style={{padding: '2rem', textAlign: 'center', color: 'var(--mikado-yellow)'}}>{analysisError}</div>}
                 {!isAnalysisLoading && !analysisError && analysisData && (
                   <>
-                    <p><strong>Best Role:</strong> {analysisData.best_role.role} <span>({analysisData.best_role.score})</span></p>
+                    {analysisData.best_role ? (
+                      <p><strong>Best Role:</strong> {analysisData.best_role.role} <span>({analysisData.best_role.score})</span></p>
+                    ) : (
+                      <p>No suitable roles found for this tier.</p>
+                    )}
                     <h5>All Positive Roles:</h5>
                     <ul>
                       {analysisData.positive_roles.map(r => (

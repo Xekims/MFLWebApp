@@ -23,7 +23,7 @@ const AddPlayerModal = ({ onAdd, onCancel, clubRosterIds }) => {
     }, [clubRosterIds]);
 
     const sortedAgencyPlayers = useMemo(() => {
-        let sortablePlayers = [...agencyPlayers];
+        let sortablePlayers = [...players];
         if (sortConfig.key) {
             sortablePlayers.sort((a, b) => {
                 if (a[sortConfig.key] < b[sortConfig.key]) {
@@ -274,7 +274,7 @@ export default function ClubView() {
                 const position = slotData.position;
                 const validRolesForSlot = position ? rolesByPosition[position] || [] : [];
                 return (
-                  <tr key={slot}><td>{slot}</td><td><select value={slotData.role} onChange={(e) => handleRoleChange(slot, e.target.value)} style={{width: '100%', backgroundColor: 'transparent', border: 'none'}}>{validRolesForSlot.length > 0 ? (validRolesForSlot.map(roleOption => (<option key={roleOption} value={roleOption}>{roleOption}</option>))) : (<option value="N/A">No roles for {position}</option>)}</select></td></tr>
+                  <tr key={slot}><td>{slot}</td><td><select value={slotData.role} onChange={(e) => handleRoleChange(slot, e.target.value)} className="role-select">{validRolesForSlot.length > 0 ? (validRolesForSlot.map(roleOption => (<option key={roleOption} value={roleOption}>{roleOption}</option>))) : (<option value="N/A">No roles for {position}</option>)}</select></td></tr>
                 )
               })}
             </tbody></table>

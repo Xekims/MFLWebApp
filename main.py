@@ -107,7 +107,7 @@ def calc_fit(player: pd.Series, role_name: str, tier: str):
     thresholds = TIER_THRESH.get(tier, TIER_THRESH["Iron"])
     need_pos = (role.get("Position", "") or "").strip().upper()
     player_pos = {(p or "").strip().upper() for p in (player.get("positions") or [])}
-    if need_pos not in player_pos: return -999, "Unusable"
+    if need_pos and need_pos not in player_pos: return -999, "Unusable"
     score = 0
     for i, attr_field in enumerate(["Attribute1", "Attribute2", "Attribute3", "Attribute4"]):
         code = (role.get(attr_field) or "").strip().upper()
@@ -149,18 +149,44 @@ def get_tiers():
 def get_tier_thresholds():
     return TIER_THRESH
 @app.get("/player/{player_id}/analysis")
-def get_player_analysis(player_id: int, tier: str = "Iron"):
+def get_player_analysis(player_id: int):
     player_series = fetch_single_player(player_id)
     if player_series is None or player_series.empty: raise HTTPException(status_code=404, detail="Player not found")
-    all_role_scores = []
-    for role_data in ROLES_DATA:
-        role_name = (role_data.get("Role") or role_data.get("RoleType") or "").strip().upper()
-        score, label = calc_fit(player_series, role_name, tier)
-        if label != "Unusable": all_role_scores.append({ "role": role_name, "score": score, "label": label })
-    all_role_scores.sort(key=lambda x: x["score"], reverse=True)
-    positive_roles = [r for r in all_role_scores if r["score"] >= 0]
-    best_role = all_role_scores[0] if all_role_scores else None
-    return { "player_attributes": player_series.to_dict(), "best_role": best_role, "positive_roles": positive_roles }
+
+    all_positive_roles_by_tier = {}
+    overall_best_role = None
+    overall_best_score = -float('inf')
+
+    # Iterate through all tiers to calculate roles for each
+    for tier_name in TIER_THRESH.keys():
+        all_role_scores_for_tier = []
+        for role_data in ROLES_DATA:
+            role_name = (role_data.get("Role") or role_data.get("RoleType") or "").strip().upper()
+            score, label = calc_fit(player_series, role_name, tier_name) # Calculate for current tier_name
+            if label != "Unusable":
+                all_role_scores_for_tier.append({
+                    "role": role_name,
+                    "score": score,
+                    "label": label,
+                    "position": role_data.get("Position", ""),
+                    "tier": tier_name # Add tier to the role data
+                })
+        
+        all_role_scores_for_tier.sort(key=lambda x: x["score"], reverse=True)
+        positive_roles_for_tier = [r for r in all_role_scores_for_tier if r["score"] >= 0]
+        
+        if positive_roles_for_tier:
+            all_positive_roles_by_tier[tier_name] = positive_roles_for_tier
+            # Check if the best role for this tier is the overall best
+            if positive_roles_for_tier[0]["score"] > overall_best_score:
+                overall_best_score = positive_roles_for_tier[0]["score"]
+                overall_best_role = positive_roles_for_tier[0]
+
+    return {
+        "player_attributes": player_series.to_dict(),
+        "overall_best_role": overall_best_role,
+        "all_positive_roles_by_tier": all_positive_roles_by_tier
+    }
 @app.post("/squad/assign")
 def assign_squad(req: AssignSquadRequest):
     players_df = fetch_players()
@@ -235,14 +261,32 @@ def get_owned_players_with_club_assignment():
     sorted_tiers = list(TIER_THRESH.keys()) # Tiers are already ordered from highest to lowest
 
     def find_best_fit(player_series):
+        player_pos = {(p or "").strip().upper() for p in (player_series.get("positions") or [])}
         for tier in sorted_tiers:
+            best_role_for_tier = None
+            max_score_for_tier = -1
+
             for role_data in ROLES_DATA:
                 role_name = (role_data.get("Role") or role_data.get("RoleType") or "").strip().upper()
                 if not role_name: continue
+
+                role_info = ROLE_LOOKUP.get(role_name)
+                if not role_info:
+                    continue
+                
+                required_pos = (role_info.get("Position", "") or "").strip().upper()
+                if required_pos and required_pos not in player_pos:
+                    continue
                 
                 score, label = calc_fit(player_series, role_name, tier)
-                if score >= 0:
-                    return pd.Series([tier, role_name], index=['bestTier', 'bestRole'])
+                
+                if score > max_score_for_tier:
+                    max_score_for_tier = score
+                    best_role_for_tier = role_name
+            
+            if max_score_for_tier >= 0:
+                return pd.Series([tier, best_role_for_tier], index=['bestTier', 'bestRole'])
+
         return pd.Series(["Unrated", "N/A"], index=['bestTier', 'bestRole'])
 
     best_fit_df = players_df.apply(find_best_fit, axis=1)

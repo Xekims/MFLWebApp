@@ -65,19 +65,24 @@ export default function Agency() {
   const handlePlayerClick = async (player) => {
     if (!player.id) return;
     
-    const initialTier = player.bestTier !== 'Unrated' ? player.bestTier : 'Iron';
-    setAnalysisTier(initialTier);
     setAnalyzedPlayer(player);
-    fetchAnalysis(player.id, initialTier);
+    // Fetch analysis data. The initial tier will be set based on overall_best_role from the fetched data.
+    fetchAnalysis(player.id); 
   };
 
-  const fetchAnalysis = async (playerId, tier) => {
+  const fetchAnalysis = async (playerId) => { // Removed tier parameter
     setIsAnalysisLoading(true);
     setAnalysisError('');
     setAnalysisData(null);
     try {
-      const data = await api.fetchPlayerAnalysis(playerId, tier);
+      const data = await api.fetchPlayerAnalysis(playerId); // No longer pass tier
       setAnalysisData(data);
+      // Set initial analysisTier based on overall_best_role from fetched data
+      if (data.overall_best_role) {
+        setAnalysisTier(data.overall_best_role.tier);
+      } else if (orderedTiers.length > 0) {
+        setAnalysisTier(orderedTiers[0]); // Default to first available tier if no best role
+      }
     } catch (err) {
       console.error("Player analysis failed:", err);
       setAnalysisError("Could not load player analysis.");
@@ -89,9 +94,8 @@ export default function Agency() {
   const handleTierChange = (e) => {
     const newTier = e.target.value;
     setAnalysisTier(newTier);
-    if (analyzedPlayer) {
-      fetchAnalysis(analyzedPlayer.id, newTier);
-    }
+    // No need to re-fetch, analysisData already contains all tiers.
+    // The rendering logic will update based on newTier.
   };
 
   const sortedPlayers = useMemo(() => {
@@ -239,12 +243,20 @@ export default function Agency() {
                 {analysisError && <div style={{padding: '2rem', textAlign: 'center', color: 'var(--mikado-yellow)'}}>{analysisError}</div>}
                 {!isAnalysisLoading && !analysisError && analysisData && (
                   <>
-                    <p><strong>Best Role:</strong> {analysisData.best_role.role} <span>({analysisData.best_role.score})</span></p>
+                    {analysisData.overall_best_role && analysisData.overall_best_role.tier === analysisTier && (
+                      <p><strong>Best Role:</strong> {analysisData.overall_best_role.role} <span>({analysisData.overall_best_role.score})</span></p>
+                    )}
                     <h5>All Positive Roles:</h5>
                     <ul>
-                      {analysisData.positive_roles.map(r => (
-                        <li key={r.role}>{r.role} <span>{r.score} ({r.label})</span></li>
-                      ))}
+                      {analysisData.all_positive_roles_by_tier && analysisData.all_positive_roles_by_tier[analysisTier] && analysisData.all_positive_roles_by_tier[analysisTier].length > 0 ? (
+                        analysisData.all_positive_roles_by_tier[analysisTier]
+                          .filter(role => !(analysisData.overall_best_role && role.role === analysisData.overall_best_role.role && role.tier === analysisData.overall_best_role.tier))
+                          .map((role, index) => (
+                            <li key={index}>{role.role} <span>{role.score} ({role.label})</span></li>
+                          ))
+                      ) : (
+                        <li>No positive roles found for this tier.</li>
+                      )}
                     </ul>
                   </>
                 )}

@@ -48,6 +48,14 @@ export async function searchMarketplace(payload) {
   return data;
 }
 
+export async function fetchPlayerById(playerId) {
+  const res = await fetch(`${API_URL}/player/${playerId}/analysis`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch player data: ${res.status}`);
+  }
+  return res.json();
+}
+
 export async function fetchPlayerAnalysis(playerId, tier) {
   const res = await fetch(`${API_URL}/player/${playerId}/analysis?tier=${tier}`);
   if (!res.ok) {
