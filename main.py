@@ -59,10 +59,10 @@ def fetch_player_listing(player_id: int) -> Dict:
 
 def fetch_single_player(player_id: int, as_series=False):
     try:
-        r = requests.get(f"{EVENTS_API_BASE}?playerId={player_id}&limit=1", timeout=30)
+        r = requests.get(f"{PLAYERS_API_BASE}/{player_id}", timeout=30)
         r.raise_for_status()
         data = r.json()
-        player_data = data.get("resources", {}).get("players", {}).get(str(player_id))
+        player_data = data.get("player")
         if not player_data: return None
         if as_series:
             m = player_data.get("metadata", {})

@@ -43,6 +43,14 @@ const getAttributeStyle = (value) => {
   return { backgroundColor, color, fontWeight: 'bold', textAlign: 'center', borderRadius: '8px', padding: '0.5rem 1rem', display: 'inline-block' };
 };
 
+const formatNationality = (nationality) => {
+  if (!nationality) return '';
+  return nationality
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
+
 const PlayerCard = ({ playerData, analysisTier, setAnalysisTier, orderedTiers }) => {
   const { id, metadata, activeContract, listing, overall_best_role, all_positive_roles_by_tier } = playerData;
   const photoUrl = `https://d13e14gtps4iwl.cloudfront.net/players/v2/${id}/photo.webp`;
@@ -110,7 +118,7 @@ const PlayerCard = ({ playerData, analysisTier, setAnalysisTier, orderedTiers })
           </div>
           <div className="player-details">
             <h2>{`${metadata.firstName} ${metadata.lastName}`}</h2>
-            <p>{(metadata.nationalities || []).join(', ')}</p>
+            <p>{(metadata.nationalities || []).map(formatNationality).join(', ')}</p>
             <p>{activeContract?.club?.name || 'Free Agent'}</p>
           </div>
           <div className="positions">
