@@ -49,18 +49,18 @@ export async function searchMarketplace(payload) {
   return data;
 }
 
-export async function fetchPlayerById(playerId) {
-  const res = await fetch(`${API_URL}/player/${playerId}/analysis`);
+export async function fetchPlayerCardAnalysis(playerId) {
+  const res = await fetch(`${API_URL}/player/${playerId}/card-analysis`);
   if (!res.ok) {
-    throw new Error(`Failed to fetch player data: ${res.status}`);
+    throw new Error(`Failed to fetch player card analysis: ${res.status}`);
   }
   return res.json();
 }
 
-export async function fetchPlayerAnalysis(playerId, tier) {
-  const res = await fetch(`${API_URL}/player/${playerId}/analysis?tier=${tier}`);
+export async function fetchPlayerRoleAnalysis(playerId) {
+  const res = await fetch(`${API_URL}/player/${playerId}/role-analysis`);
   if (!res.ok) {
-    throw new Error(`Failed to fetch player analysis: ${res.status}`);
+    throw new Error(`Failed to fetch player role analysis: ${res.status}`);
   }
   return res.json();
 }
@@ -183,33 +183,31 @@ export async function deleteFormation(formationName) {
   return res;
 }
 
-// In your api.js file
+export async function fetchTiers() {
+  const res = await fetch(`${API_URL}/tiers`);
+  if (!res.ok) throw new Error('Failed to fetch tiers');
+  return res.json();
+}
+
 export async function fetchClubByName(clubName) {
-    // Use the existing API_URL constant defined at the top of this file.
     const response = await fetch(`${API_URL}/clubs/${encodeURIComponent(clubName)}`);
     if (!response.ok) {
-        // Return null for 404 so the component can handle it gracefully
         if (response.status === 404) return null;
         throw new Error(`Failed to fetch club ${clubName}`);
     }
     return response.json();
 }
 
-// Add this function to your d:\MFL\WebApp\frontend\src\api.js file
-
 export async function deleteClub(clubName) {
   const response = await fetch(`${API_URL}/clubs/${encodeURIComponent(clubName)}`, {
     method: 'DELETE',
   });
   if (!response.ok) {
-    // Try to get a more specific error message from the backend
     const errorData = await response.json().catch(() => ({ detail: 'Failed to delete club.' }));
     throw new Error(errorData.detail);
   }
-  // The backend returns a success message which we can return or ignore
   return response.json();
 }
-// This function should be added to your api.js file
 export async function updatePlayerAssignment(assignmentData) {
   const response = await fetch(`${API_URL}/players/assign`, {
     method: 'POST',

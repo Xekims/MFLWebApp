@@ -39,14 +39,14 @@ export default function Agency() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [ownedPlayers, clubsData, tiersResponse] = await Promise.all([
+        const [ownedPlayers, clubsData, tiersData] = await Promise.all([
           api.fetchOwnedPlayers(),
           api.fetchClubs(),
-          fetch('http://127.0.0.1:8000/tiers').then(res => res.json())
+          api.fetchTiers()
         ]);
 
         setClubs(clubsData || []);
-        const tiers = tiersResponse.tiers || [];
+        const tiers = tiersData.tiers || [];
         setOrderedTiers(tiers);
         if (tiers.length > 0 && !tiers.includes('Iron')) {
           setAnalysisTier(tiers[0]);
@@ -66,22 +66,20 @@ export default function Agency() {
     if (!player.id) return;
     
     setAnalyzedPlayer(player);
-    // Fetch analysis data. The initial tier will be set based on overall_best_role from the fetched data.
     fetchAnalysis(player.id); 
   };
 
-  const fetchAnalysis = async (playerId) => { // Removed tier parameter
+  const fetchAnalysis = async (playerId) => {
     setIsAnalysisLoading(true);
     setAnalysisError('');
     setAnalysisData(null);
     try {
-      const data = await api.fetchPlayerAnalysis(playerId); // No longer pass tier
+      const data = await api.fetchPlayerRoleAnalysis(playerId);
       setAnalysisData(data);
-      // Set initial analysisTier based on overall_best_role from fetched data
       if (data.overall_best_role) {
         setAnalysisTier(data.overall_best_role.tier);
       } else if (orderedTiers.length > 0) {
-        setAnalysisTier(orderedTiers[0]); // Default to first available tier if no best role
+        setAnalysisTier(orderedTiers[0]);
       }
     } catch (err) {
       console.error("Player analysis failed:", err);
@@ -94,8 +92,6 @@ export default function Agency() {
   const handleTierChange = (e) => {
     const newTier = e.target.value;
     setAnalysisTier(newTier);
-    // No need to re-fetch, analysisData already contains all tiers.
-    // The rendering logic will update based on newTier.
   };
 
   const sortedPlayers = useMemo(() => {
@@ -181,7 +177,7 @@ export default function Agency() {
                 <tr key={p.id} onClick={() => handlePlayerClick(p)} style={{cursor: 'pointer'}}>
                   <td>{p.firstName} {p.lastName}</td>
                   <td>{p.age}</td>
-                  <td>{p.overall}</td>
+                  <td style={getAttributeStyle(p.overall)}>{p.overall}</td>
                   <td>{p.positions.join(', ')}</td>
                   <td>{p.bestTier}</td>
                   <td>{p.bestRole}</td>
