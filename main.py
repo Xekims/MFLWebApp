@@ -368,8 +368,35 @@ class PlayerSearchRequest(BaseModel):
 @app.post("/market/search")
 def search_market(req: PlayerSearchRequest):
     headers = {"Authorization": f"Bearer {req.auth_token}"}
+    
+    # Build query parameters for the external API
+    external_api_params = {
+        "limit": 50,
+        "type": "PLAYER",
+        "status": "AVAILABLE",
+        "view": "full"
+    }
+
+    if req.positions:
+        external_api_params["positions"] = ",".join(req.positions)
+
+    if req.paceMin is not None:
+        external_api_params["paceMin"] = req.paceMin
+    if req.shootingMin is not None:
+        external_api_params["shootingMin"] = req.shootingMin
+    if req.passingMin is not None:
+        external_api_params["passingMin"] = req.passingMin
+    if req.dribblingMin is not None:
+        external_api_params["dribblingMin"] = req.dribblingMin
+    if req.defenseMin is not None:
+        external_api_params["defenseMin"] = req.defenseMin
+    if req.physicalMin is not None:
+        external_api_params["physicalMin"] = req.physicalMin
+    if req.goalkeepingMin is not None:
+        external_api_params["goalkeepingMin"] = req.goalkeepingMin
+
     try:
-        r = requests.get(MARKETPLACE_API, headers=headers, timeout=30)
+        r = requests.get(MARKETPLACE_API, headers=headers, params=external_api_params, timeout=30)
         r.raise_for_status()
         listings = r.json()
     except requests.exceptions.RequestException as e:
@@ -379,7 +406,7 @@ def search_market(req: PlayerSearchRequest):
     if players_df.empty:
         return []
 
-    # Apply filters from request
+    # Apply filters from request (these are already applied to filtered_players_df)
     filtered_players_df = players_df.copy()
 
     if req.positions:
