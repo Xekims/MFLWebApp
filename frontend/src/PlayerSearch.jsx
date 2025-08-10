@@ -204,7 +204,7 @@ export default function PlayerSearch() {
 
   useEffect(() => {
     api.fetchTiers().then(data => {
-      const tiers = data.tiers ?? [];
+      const tiers = data.tiers ? Object.keys(data.tiers) : [];
       setOrderedTiers(tiers);
       if (tiers.length > 0) setAnalysisTier(tiers[0]);
     }).catch(err => console.error("Failed to load tiers", err));
