@@ -380,20 +380,21 @@ def search_market(req: PlayerSearchRequest):
     if req.positions:
         external_api_params["positions"] = ",".join(req.positions)
 
-    if req.paceMin is not None:
-        external_api_params["paceMin"] = req.paceMin
-    if req.shootingMin is not None:
-        external_api_params["shootingMin"] = req.shootingMin
-    if req.passingMin is not None:
-        external_api_params["passingMin"] = req.passingMin
-    if req.dribblingMin is not None:
-        external_api_params["dribblingMin"] = req.dribblingMin
-    if req.defenseMin is not None:
-        external_api_params["defenseMin"] = req.defenseMin
-    if req.physicalMin is not None:
-        external_api_params["physicalMin"] = req.physicalMin
-    if req.goalkeepingMin is not None:
-        external_api_params["goalkeepingMin"] = req.goalkeepingMin
+    # Temporarily removed attribute minimums from external_api_params
+    # if req.paceMin is not None:
+    #     external_api_params["paceMin"] = req.paceMin
+    # if req.shootingMin is not None:
+    #     external_api_params["shootingMin"] = req.shootingMin
+    # if req.passingMin is not None:
+    #     external_api_params["passingMin"] = req.passingMin
+    # if req.dribblingMin is not None:
+    #     external_api_params["dribblingMin"] = req.dribblingMin
+    # if req.defenseMin is not None:
+    #     external_api_params["defenseMin"] = req.defenseMin
+    # if req.physicalMin is not None:
+    #     external_api_params["physicalMin"] = req.physicalMin
+    # if req.goalkeepingMin is not None:
+    #     external_api_params["goalkeepingMin"] = req.goalkeepingMin
 
     try:
         r = requests.get(MARKETPLACE_API, headers=headers, params=external_api_params, timeout=30)
