@@ -377,10 +377,10 @@ def search_market(req: PlayerSearchRequest):
         "view": "full"
     }
 
-    if req.positions:
-        external_api_params["positions"] = ",".join(req.positions)
+    # Temporarily removed all filters from external_api_params
+    # if req.positions:
+    #     external_api_params["positions"] = ",".join(req.positions)
 
-    # Temporarily removed attribute minimums from external_api_params
     # if req.paceMin is not None:
     #     external_api_params["paceMin"] = req.paceMin
     # if req.shootingMin is not None:
