@@ -402,34 +402,10 @@ def search_market(req: PlayerSearchRequest):
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=400, detail=f"Failed to fetch marketplace listings: {e}")
 
-    players_df = fetch_players()
-    if players_df.empty:
+    # Fetch all players once
+    all_players_df = fetch_players()
+    if all_players_df.empty:
         return []
-
-    # Apply filters from request (these are already applied to filtered_players_df)
-    filtered_players_df = players_df.copy()
-
-    if req.positions:
-        # Filter by positions: player must have at least one of the requested positions
-        filtered_players_df = filtered_players_df[
-            filtered_players_df['positions'].apply(lambda p_list: any(pos.upper() in [rp.upper() for rp in req.positions] for pos in p_list))
-        ]
-
-    # Apply attribute minimums
-    if req.paceMin is not None:
-        filtered_players_df = filtered_players_df[filtered_players_df['pace'] >= req.paceMin]
-    if req.shootingMin is not None:
-        filtered_players_df = filtered_players_df[filtered_players_df['shooting'] >= req.shootingMin]
-    if req.passingMin is not None:
-        filtered_players_df = filtered_players_df[filtered_players_df['passing'] >= req.passingMin]
-    if req.dribblingMin is not None:
-        filtered_players_df = filtered_players_df[filtered_players_df['dribbling'] >= req.dribblingMin]
-    if req.defenseMin is not None:
-        filtered_players_df = filtered_players_df[filtered_players_df['defense'] >= req.defenseMin]
-    if req.physicalMin is not None:
-        filtered_players_df = filtered_players_df[filtered_players_df['physical'] >= req.physicalMin]
-    if req.goalkeepingMin is not None:
-        filtered_players_df = filtered_players_df[filtered_players_df['goalkeeping'] >= req.goalkeepingMin]
 
     results = []
     for listing in listings:
@@ -437,13 +413,14 @@ def search_market(req: PlayerSearchRequest):
         if player_id is None:
             continue
         
-        # Check if the player exists in the filtered DataFrame
-        player_row = filtered_players_df[filtered_players_df['id'] == player_id]
+        # Get player data from the all_players_df
+        player_row = all_players_df[all_players_df['id'] == player_id]
         if player_row.empty:
-            continue # Skip if player doesn't meet filters
+            continue # Skip if player data not found (shouldn't happen if external API is consistent)
 
         player_series = player_row.iloc[0] # Get the first (and only) row as a Series
         
+        # Apply backend filtering based on role and tier fit
         score, label, _ = calc_fit(player_series, req.role_name, req.tier)
         
         # Only include players with a positive fit score
