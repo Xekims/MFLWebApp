@@ -228,7 +228,7 @@ export default function Marketplace() {
                   const rowStyle = { borderTop: '1px solid var(--border-color)', backgroundColor: p.retirementYears ? 'rgba(251, 133, 0, 0.15)' : 'transparent', cursor: 'pointer' };
                   return (
                     <tr key={listing.listingResourceId} style={rowStyle} onClick={() => handlePlayerClick(listing)}>
-                      <td style={{fontWeight: 'bold'}}>{p.fit_score} ({p.fit_label})</td>
+                      <td style={{fontWeight: 'bold'}}>{p.fit_label}</td>
                       <td>{p.firstName} {p.lastName}</td>
                       <td>{p.age}</td>
                       <td style={{fontWeight: 'bold'}}>{p.overall}</td>
