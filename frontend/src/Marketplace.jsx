@@ -46,16 +46,18 @@ export default function Marketplace() {
   const [analysisTier, setAnalysisTier] = useState('Iron');
 
   const [attributeOrder, setAttributeOrder] = useState(defaultAttributeOrder);
+  const [tierThresholds, setTierThresholds] = useState({}); // New state variable
 
   useEffect(() => {
     (async () => {
       try {
-        const [rolesData, tiersData] = await Promise.all([
+        const [rolesData, tiersResponse] = await Promise.all([ // Renamed tiersData to tiersResponse
           api.fetchRoles(),
           fetch('http://127.0.0.1:8000/tiers').then(res => res.json())
         ]);
         setRoles(rolesData);
-        const tiers = tiersData.tiers ?? [];
+        const tiers = tiersResponse.tiers ? Object.keys(tiersResponse.tiers) : []; // Get tier names from keys
+        setTierThresholds(tiersResponse.tiers || {}); // Store the full TIER_THRESH object
         setAllTiers(tiers);
         if (!tiers.includes('Iron') && tiers.length > 0) {
           setTier(tiers[0]);
@@ -95,17 +97,41 @@ export default function Marketplace() {
     setError('');
     setResults([]);
     try {
+      const thresholds = tierThresholds[tier] || []; // Get thresholds for the selected tier
+      const attributeMins = {};
+      const attributeKeys = ['pace', 'shooting', 'passing', 'dribbling', 'defense', 'physical', 'goalkeeping'];
+
+      // Initialize all attribute minimums to 0
+      attributeKeys.forEach(key => {
+        attributeMins[`${key}Min`] = 0;
+      });
+
+      // Map attribute codes to their full names (from main.py's ATTR_MAP)
+      const attrMap = {
+        "PAC": "pace", "SHO": "shooting", "PAS": "passing", "DRI": "dribbling",
+        "DEF": "defense", "PHY": "physical", "GK": "goalkeeping"
+      };
+
+      // Calculate minimums for the role's main attributes
+      const roleAttributes = [
+        currentRoleDetails.Attribute1,
+        currentRoleDetails.Attribute2,
+        currentRoleDetails.Attribute3,
+        currentRoleDetails.Attribute4
+      ].filter(Boolean); // Filter out empty strings
+
+      roleAttributes.forEach((attrCode, index) => {
+        const fullAttrName = attrMap[attrCode];
+        if (fullAttrName && thresholds[index] !== undefined) {
+          attributeMins[`${fullAttrName}Min`] = thresholds[index];
+        }
+      });
+
       const searchParams = {
         positions: currentRoleDetails.Positions,
-        tier: tier,
-        paceMin: currentRoleDetails.MinPace || 0,
-        shootingMin: currentRoleDetails.MinShooting || 0,
-        passingMin: currentRoleDetails.MinPassing || 0,
-        dribblingMin: currentRoleDetails.MinDribbling || 0,
-        defenseMin: currentRoleDetails.MinDefense || 0,
-        physicalMin: currentRoleDetails.MinPhysical || 0,
-        goalkeepingMin: currentRoleDetails.MinGoalkeeping || 0,
+        ...attributeMins, // Spread the calculated attribute minimums
       };
+
       const data = await api.searchMarketplace(searchParams);
       setResults(data ?? []);
     } catch (err) {

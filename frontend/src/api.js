@@ -49,21 +49,70 @@ export async function saveSquad(squadName, squadData) {
 }
 
 export async function searchMarketplace(params) {
-  const query = new URLSearchParams({
-    limit: 25,
+  // Destructure to separate known keys
+  const { role_name, auth_token, tier, ...filters } = params;
+  
+  // **Case 1: Role-specific search with auth_token (called from SquadPicker)**
+  if (role_name && auth_token) {
+    try {
+      const res = await fetch(`${API_URL}/market/search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role_name: role_name,
+          tier: tier || "Iron",        // default to Iron if tier not provided
+          auth_token: auth_token
+        })
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(errorData.detail || errorData.message || 'Marketplace search via backend failed');
+      }
+      return await res.json();
+    } catch (err) {
+      // Log and rethrow to be caught in the UI
+      console.error("Error in backend marketplace search:", err);
+      throw err;
+    }
+  }
+  
+  // **Case 2: Direct search query to external API (from Marketplace page)**
+  // Build query parameters, excluding 'tier'
+  const queryParams = {
+    limit: 50,
     type: 'PLAYER',
     status: 'AVAILABLE',
-    ...params,
-    positions: params.positions ? params.positions.join(',') : undefined,
     view: 'full'
-  }).toString();
-  const res = await fetch(`${EXTERNAL_API_URL}/listings?${query}`);
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({ message: 'Unknown error' }));
-    throw new Error(errorData.message || 'Failed to fetch marketplace listings');
+  };
+  // Include positions filter if available
+  if (filters.positions && filters.positions.length > 0) {
+    // If positions is an array, join it; if it's already a string, use it directly
+    queryParams.positions = Array.isArray(filters.positions)
+      ? filters.positions.join(',')
+      : filters.positions;
   }
-  return res.json();
+  // Include attribute minimums if provided (even 0 values)
+  if (filters.paceMin !== undefined)       queryParams.paceMin = filters.paceMin;
+  if (filters.shootingMin !== undefined)   queryParams.shootingMin = filters.shootingMin;
+  if (filters.passingMin !== undefined)    queryParams.passingMin = filters.passingMin;
+  if (filters.dribblingMin !== undefined)  queryParams.dribblingMin = filters.dribblingMin;
+  if (filters.defenseMin !== undefined)    queryParams.defenseMin = filters.defenseMin;
+  if (filters.physicalMin !== undefined)   queryParams.physicalMin = filters.physicalMin;
+  if (filters.goalkeepingMin !== undefined) queryParams.goalkeepingMin = filters.goalkeepingMin;
+  // (Note: 'tier' is intentionally omitted here)
+  
+  const queryString = new URLSearchParams(queryParams).toString();
+  const res = await fetch(`${EXTERNAL_API_URL}/listings?${queryString}`);
+  if (!res.ok) {
+    // Parse error response if possible
+    const errorData = await res.json().catch(() => ({ message: 'Unknown error' }));
+    // The external API might return an error message in { message } or { detail }
+    const errMsg = errorData.detail || errorData.message || 'Failed to fetch marketplace listings';
+    throw new Error(errMsg);
+  }
+  return await res.json();
 }
+
 
 export async function fetchPlayerAnalysis(playerId, tier) {
   // Assuming an endpoint for player analysis exists on the external API

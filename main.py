@@ -6,7 +6,7 @@ from pydantic import BaseModel
 import requests
 import json
 import pandas as pd
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 # --- Config ---
 ROLES_PATH = "roles.json"
@@ -203,7 +203,7 @@ def delete_club(club_name: str):
     raise HTTPException(status_code=404, detail="Club not found")
 @app.get("/tiers")
 def get_tiers():
-    return {"tiers": list(TIER_THRESH.keys())}
+    return {"tiers": TIER_THRESH}
 
 @app.get("/player/{player_id}/card-analysis")
 def get_player_card_analysis(player_id: int):
@@ -356,6 +356,14 @@ class PlayerSearchRequest(BaseModel):
     role_name: str
     auth_token: str
     tier: str
+    positions: Optional[List[str]] = None
+    paceMin: Optional[int] = None
+    shootingMin: Optional[int] = None
+    passingMin: Optional[int] = None
+    dribblingMin: Optional[int] = None
+    defenseMin: Optional[int] = None
+    physicalMin: Optional[int] = None
+    goalkeepingMin: Optional[int] = None
 
 @app.post("/market/search")
 def search_market(req: PlayerSearchRequest):
@@ -371,13 +379,43 @@ def search_market(req: PlayerSearchRequest):
     if players_df.empty:
         return []
 
+    # Apply filters from request
+    filtered_players_df = players_df.copy()
+
+    if req.positions:
+        # Filter by positions: player must have at least one of the requested positions
+        filtered_players_df = filtered_players_df[
+            filtered_players_df['positions'].apply(lambda p_list: any(pos.upper() in [rp.upper() for rp in req.positions] for pos in p_list))
+        ]
+
+    # Apply attribute minimums
+    if req.paceMin is not None:
+        filtered_players_df = filtered_players_df[filtered_players_df['pace'] >= req.paceMin]
+    if req.shootingMin is not None:
+        filtered_players_df = filtered_players_df[filtered_players_df['shooting'] >= req.shootingMin]
+    if req.passingMin is not None:
+        filtered_players_df = filtered_players_df[filtered_players_df['passing'] >= req.passingMin]
+    if req.dribblingMin is not None:
+        filtered_players_df = filtered_players_df[filtered_players_df['dribbling'] >= req.dribblingMin]
+    if req.defenseMin is not None:
+        filtered_players_df = filtered_players_df[filtered_players_df['defense'] >= req.defenseMin]
+    if req.physicalMin is not None:
+        filtered_players_df = filtered_players_df[filtered_players_df['physical'] >= req.physicalMin]
+    if req.goalkeepingMin is not None:
+        filtered_players_df = filtered_players_df[filtered_players_df['goalkeeping'] >= req.goalkeepingMin]
+
     results = []
     for listing in listings:
         player_id = listing.get("id")
         if player_id is None:
             continue
         
-        player_series = players_df[players_df['id'] == player_id].iloc[0]
+        # Check if the player exists in the filtered DataFrame
+        player_row = filtered_players_df[filtered_players_df['id'] == player_id]
+        if player_row.empty:
+            continue # Skip if player doesn't meet filters
+
+        player_series = player_row.iloc[0] # Get the first (and only) row as a Series
         
         score, label, _ = calc_fit(player_series, req.role_name, req.tier)
         
