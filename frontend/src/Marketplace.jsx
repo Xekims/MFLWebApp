@@ -87,15 +87,26 @@ export default function Marketplace() {
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    if (!selectedRole || !authToken) {
-      setError('Please select a role and provide an auth token.');
+    if (!selectedRole || !currentRoleDetails) {
+      setError('Please select a role.');
       return;
     }
     setIsLoading(true);
     setError('');
     setResults([]);
     try {
-      const data = await api.searchMarketplace({ role_name: selectedRole, auth_token: authToken, tier: tier });
+      const searchParams = {
+        positions: currentRoleDetails.Positions,
+        tier: tier,
+        paceMin: currentRoleDetails.MinPace || 0,
+        shootingMin: currentRoleDetails.MinShooting || 0,
+        passingMin: currentRoleDetails.MinPassing || 0,
+        dribblingMin: currentRoleDetails.MinDribbling || 0,
+        defenseMin: currentRoleDetails.MinDefense || 0,
+        physicalMin: currentRoleDetails.MinPhysical || 0,
+        goalkeepingMin: currentRoleDetails.MinGoalkeeping || 0,
+      };
+      const data = await api.searchMarketplace(searchParams);
       setResults(data ?? []);
     } catch (err) {
       setError('Search failed. Check the token or console for details.');

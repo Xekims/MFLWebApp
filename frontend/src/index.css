@@ -10,6 +10,10 @@
   --accent-primary: #033860;
   --accent-primary-hover: #001242;
   --border-color: #000022;
+
+  /* Default Club Colors (if not overridden) */
+  --club-main-color: var(--accent-primary);
+  --club-secondary-color: var(--accent-primary-hover);
 }
 
 /* --- 2. GLOBAL STYLES & TYPOGRAPHY --- */
@@ -326,11 +330,12 @@ tbody tr:hover {
 
 .tier-badge {
     display: inline-block;
-    padding: 0.25rem 0.75rem;
+    padding: 0.5rem 0.75rem;
     border-radius: 12px;
     font-size: 0.8rem;
     font-weight: bold;
-    align-self: flex-start;
+    align-self: center;
+    margin-top: 1rem;
 }
 
 .tier-diamond { background-color: #0081b8; color: #000814; }
@@ -384,9 +389,12 @@ tbody tr:hover {
     flex: 0 0 200px;
     padding: 1.5rem;
     display: flex;
+    flex-direction: column; /* Changed to column */
     align-items: center;
-    justify-content: center;
-    background: var(--background-tertiary);
+    justify-content: flex-start; /* Align to top */
+    background: transparent;
+    position: relative; /* For absolute positioning of flag/badge */
+    gap: 1rem;
 }
 
 .player-photo {
@@ -394,6 +402,15 @@ tbody tr:hover {
     height: 160px;
     border-radius: 50%;
     border: 4px solid var(--accent-primary);
+    margin-bottom: 1rem; /* Spacing below photo */
+}
+
+.player-flag {
+    width: 40px;
+    height: auto;
+    margin-bottom: 0.5rem;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 3px;
 }
 
 .player-card-center {
@@ -408,6 +425,7 @@ tbody tr:hover {
     font-weight: 700;
     color: var(--text-primary);
     line-height: 1;
+    margin-bottom: 1rem;
 }
 
 .player-details h2 {
@@ -426,6 +444,7 @@ tbody tr:hover {
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;
+    justify-content: center;
 }
 
 .position-pill {
@@ -505,4 +524,157 @@ tbody tr:hover {
 
 .positive-roles-list li span {
     font-weight: 700;
+}
+
+/* Segmented Control for Tiers */
+.segmented-control {
+    display: flex;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+}
+
+.segmented-control button {
+    flex: 1;
+    background-color: var(--background-main);
+    color: var(--text-secondary);
+    border: none;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+    border-radius: 0; /* Remove individual button border-radius */
+}
+
+.segmented-control button:hover {
+    background-color: var(--background-tertiary);
+}
+
+.segmented-control button.active {
+    background-color: var(--accent-primary);
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+/* Role Tile Heatmap & Hover Effects */
+.role-tile {
+    background-color: var(--background-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: all 0.2s ease-in-out;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.role-tile:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    z-index: 1;
+}
+
+.role-tile .role-title {
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.role-tile .role-score {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.role-tile.strong-role {
+    border: 2px solid var(--accent-primary);
+}
+
+.role-tile.strong-role .role-title {
+    font-weight: 800;
+    color: var(--accent-primary);
+}
+
+.role-description-hover {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.9);
+    color: var(--text-secondary);
+    padding: 1rem;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+    pointer-events: none; /* Allow clicks on elements below */
+}
+
+.role-tile:hover .role-description-hover {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.role-description-hover p {
+    margin: 0.5rem 0;
+    text-align: center;
+    font-size: 0.9rem;
+}
+
+/* Branding Upgrade - Club Colors */
+.player-card-left.club-themed {
+    background: linear-gradient(to bottom, var(--club-main-color, var(--accent-primary)), #0d1317);
+}
+
+.player-card-container.club-themed{ position:relative; }
+.player-card-container.club-themed::before{
+  content:"";
+  position:absolute; inset:-1px;
+  pointer-events:none;
+  border-radius:12px;
+  background:linear-gradient(45deg,var(--club-main-color,var(--accent-primary)),var(--club-secondary-color,var(--accent-primary-hover)));
+  opacity:.15; /* subtle */
+}
+
+.player-card-container.club-themed::before {
+  background: linear-gradient(45deg, var(--club-main-color, var(--accent-primary)), var(--club-secondary-color, var(--accent-primary-hover)));
+}
+
+
+.club-themed .player-photo {
+  border-color: var(--club-secondary-color, var(--accent-primary));
+}
+
+.position-pill.club-themed {
+  background: var(--club-secondary-color, var(--accent-primary));
+  border-color: var(--club-secondary-color, var(--accent-primary-hover));
+}
+
+.club-themed .overall-rating span {
+  text-shadow: 0 0 10px var(--club-main-color, var(--accent-primary));
+}
+
+.club-themed .market-listing {
+  box-shadow: 0 0 10px var(--club-main-color, rgba(0, 255, 255, 0.1));
+}
+
+.club-themed .role-analysis-section .segmented-control button.active {
+  background-color: var(--club-main-color, var(--accent-primary));
+  color: var(--text-primary);
+}
+
+.club-themed .role-tile.strong-role {
+  border-color: var(--club-main-color, var(--accent-primary));
+}
+
+.club-themed .role-tile.strong-role .role-title {
+  color: var(--club-main-color, var(--accent-primary));
 }

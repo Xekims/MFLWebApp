@@ -140,9 +140,16 @@ export default function ClubView() {
       setAllTiers(availableTiers);
 
       if (clubData) {
-        const roster = clubData.roster || [];
-        setRosterPlayers(roster);
-        setRosterIds(roster.map(p => p.id));
+        const rosterIdList = clubData.roster || [];
+        setRosterIds(rosterIdList);
+
+        if (rosterIdList.length > 0) {
+          const players = await api.fetchPlayersByIds(rosterIdList);
+          setRosterPlayers(players);
+        } else {
+          setRosterPlayers([]);
+        }
+
         // Set the tier from the club, but validate it against the available tiers
         if (clubData.tier && availableTiers.includes(clubData.tier)) {
           setTier(clubData.tier);
@@ -155,7 +162,7 @@ export default function ClubView() {
         setError(`Club "${clubName}" not found.`);
       }
 
-      setFormations(formList?.formations ?? []);
+      setFormations(formList ? Object.keys(formList) : []);
       setAllRoles(rolesList ?? []);
     } catch(err) {
       console.error("Failed to load club data", err);
@@ -183,11 +190,29 @@ export default function ClubView() {
     const name = e.target.value;
     setSelectedFormation(name);
     setSimulationResult([]);
-    if (!name) { setRoleMap({}); return; }
+    if (!name) {
+      setRoleMap({});
+      return;
+    }
     try {
-      const map = await api.fetchFormationMap(name);
-      setRoleMap(map || {});
-    } catch (err) { console.error(err); setRoleMap({}); }
+      const formationData = await api.fetchFormationMap(name);
+      if (formationData) {
+        const initialRoleMap = {};
+        for (const [slot, position] of Object.entries(formationData)) {
+          const rolesForPosition = rolesByPosition[position] || [];
+          initialRoleMap[slot] = {
+            position: position,
+            role: rolesForPosition.length > 0 ? rolesForPosition[0] : null,
+          };
+        }
+        setRoleMap(initialRoleMap);
+      } else {
+        setRoleMap({});
+      }
+    } catch (err) {
+      console.error(err);
+      setRoleMap({});
+    }
   }
 
   function handleRoleChange(slot, newRole) {
@@ -238,7 +263,7 @@ export default function ClubView() {
         </div>
         {isLoading ? <p>Loading roster...</p> : (
           <table>
-            <thead><tr><th>Name</th><th>Age</th><th>Overall</th><th>Positions</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Name</th><th>Age</th><th>Overall</th><th>Positions</th><th>Best Role</th><th>Actions</th></tr></thead>
             <tbody>
               {rosterPlayers.map(p => (
                 <tr key={p.id}>
@@ -246,6 +271,7 @@ export default function ClubView() {
                   <td>{p.age}</td>
                   <td>{p.overall}</td>
                   <td>{p.positions.join(', ')}</td>
+                  <td>{p.bestRole}</td>
                   <td><button onClick={() => handleRemovePlayer(p.id)}>Remove</button></td>
                 </tr>
               ))}

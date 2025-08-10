@@ -11,6 +11,7 @@ import {
   Legend,
 } from 'chart.js';
 import { Radar } from 'react-chartjs-2';
+import RoleGrid from './RoleGrid';
 
 // Register Chart.js components
 ChartJS.register(
@@ -24,7 +25,7 @@ ChartJS.register(
 
 // Helper function to determine point color based on value
 const getPointColor = (value) => {
-  if (value >= 95) return '#ffc300'; // Gold
+  if (value >= 95) return '#186e5dff'; // Gold
   if (value >= 85) return '#7209b7'; // Purple
   if (value >= 75) return '#00296b'; // Blue
   if (value >= 65) return '#386641'; // Green
@@ -34,7 +35,7 @@ const getPointColor = (value) => {
 
 const getAttributeStyle = (value) => {
   let backgroundColor, color;
-  if (value >= 95) { backgroundColor = '#000814'; color = '#ffc300'; }
+  if (value >= 95) { backgroundColor = '#186e5dff'; color = '#ffc300'; }
   else if (value >= 85) { backgroundColor = '#7209b7'; color = '#fffffc'; }
   else if (value >= 75) { backgroundColor = '#00296b'; color = '#fffffc'; }
   else if (value >= 65) { backgroundColor = '#386641'; color = '#000814'; }
@@ -51,9 +52,13 @@ const formatNationality = (nationality) => {
     .join(' ');
 };
 
-const PlayerCard = ({ playerData, analysisTier, setAnalysisTier, orderedTiers }) => {
-  const { id, metadata, activeContract, listing, overall_best_role, all_positive_roles_by_tier } = playerData;
+const PlayerCard = ({ playerData, analysisTier, setAnalysisTier, orderedTiers, isLoading }) => {
+  const { id, metadata, activeContract, listing, overall_best_role, all_positive_roles_by_tier, country_code } = playerData;
   const photoUrl = `https://d13e14gtps4iwl.cloudfront.net/players/v2/${id}/photo.webp`;
+  const flagUrl = country_code ? `https://flagcdn.com/w40/${country_code}.png` : '';
+  const clubBadgeUrl = activeContract?.club?.id && activeContract?.club?.logoVersion 
+    ? `https://d13e14gtps4iwl.cloudfront.net/clubs/${activeContract.club.id}/badge.webp` // Assuming badge.webp exists
+    : '';
 
   const chartData = useMemo(() => {
     if (!metadata) return null;
@@ -106,12 +111,34 @@ const PlayerCard = ({ playerData, analysisTier, setAnalysisTier, orderedTiers })
     maintainAspectRatio: false,
   };
 
+  const clubThemeStyle = useMemo(() => {
+    if (activeContract?.club?.mainColor && activeContract?.club?.secondaryColor) {
+      return {
+        '--club-main-color': activeContract.club.mainColor,
+        '--club-secondary-color': activeContract.club.secondaryColor,
+      };
+    }
+    return {};
+  }, [activeContract]);
+
   return (
-    <div className="player-card-container">
+    <div className="player-card-container" style={clubThemeStyle}>
       <div className="player-card">
-        <div className="player-card-left">
+        {/* Left Column: Player Image, Flag, Team Badge, Positions, Tier Badge */}
+        <div className="player-card-left club-themed">
           <img src={photoUrl} alt={`${metadata.firstName} ${metadata.lastName}`} className="player-photo" />
+          {flagUrl && <img src={flagUrl} alt="Nationality Flag" className="player-flag" />}
+          <div className="positions">
+            {(metadata.positions || []).map(pos => <span key={pos} className="position-pill club-themed">{pos}</span>)}
+          </div>
+          {overall_best_role?.tier && (
+            <span className={`tier-badge tier-${overall_best_role.tier.toLowerCase()}`}>
+              {overall_best_role.tier}
+            </span>
+          )}
         </div>
+
+        {/* Center Pane: Core Info (now main info) */}
         <div className="player-card-center">
           <div className="overall-rating">
             <span style={getAttributeStyle(metadata.overall)}>{metadata.overall}</span>
@@ -121,10 +148,9 @@ const PlayerCard = ({ playerData, analysisTier, setAnalysisTier, orderedTiers })
             <p>{(metadata.nationalities || []).map(formatNationality).join(', ')}</p>
             <p>{activeContract?.club?.name || 'Free Agent'}</p>
           </div>
-          <div className="positions">
-            {(metadata.positions || []).map(pos => <span key={pos} className="position-pill">{pos}</span>)}
-          </div>
         </div>
+
+        {/* Right Pane: Stats & Market */}
         <div className="player-card-right">
           <div className="radar-chart-container">
             {chartData && <Radar data={chartData} options={chartOptions} />}
@@ -137,31 +163,30 @@ const PlayerCard = ({ playerData, analysisTier, setAnalysisTier, orderedTiers })
           )}
         </div>
       </div>
-      {overall_best_role && all_positive_roles_by_tier && (
-        <div className="role-analysis-section">
-          <div className="role-analysis-header">
-            <h4>Role Analysis</h4>
-            <select value={analysisTier} onChange={(e) => setAnalysisTier(e.target.value)}>
-              {orderedTiers.map(t => (<option key={t} value={t}>{t}</option>))}
-            </select>
+
+      {/* Roles Section */}
+      <div className="role-analysis-section">
+        <div className="role-analysis-header">
+          <h4>Role Analysis</h4>
+          <div className="segmented-control">
+            {orderedTiers.map(t => (
+              <button
+                key={t}
+                className={analysisTier === t ? 'active' : ''}
+                onClick={() => setAnalysisTier(t)}
+              >
+                {t}
+              </button>
+            ))}
           </div>
-          {overall_best_role.tier === analysisTier && (
-            <p className="best-role-display"><strong>Best Role:</strong> {overall_best_role.role} <span>({overall_best_role.score})</span></p>
-          )}
-          <h5>All Positive Roles for {analysisTier} Tier:</h5>
-          <ul className="positive-roles-list">
-            {all_positive_roles_by_tier[analysisTier] && all_positive_roles_by_tier[analysisTier].length > 0 ? (
-              all_positive_roles_by_tier[analysisTier]
-                .filter(role => !(overall_best_role && role.role === overall_best_role.role && role.tier === overall_best_role.tier))
-                .map((role, index) => (
-                  <li key={index}>{role.role} <span>{role.score} ({role.label})</span></li>
-                ))
-            ) : (
-              <li>No positive roles found for this tier.</li>
-            )}
-          </ul>
         </div>
-      )}
+        <RoleGrid
+          roles={all_positive_roles_by_tier ? all_positive_roles_by_tier[analysisTier] : []}
+          isLoading={isLoading}
+          selectedTier={analysisTier}
+          onSelect={(role) => console.log('Selected Role:', role)}
+        />
+      </div>
     </div>
   );
 };
@@ -241,14 +266,15 @@ export default function PlayerSearch() {
         </button>
       </form>
 
-      {isLoading && <div className="loading-spinner">Loading...</div>}
+      {isLoading && !playerData && <div className="loading-spinner">Loading...</div>}
       {error && <div className="error-message">{error}</div>}
       {playerData && 
         <PlayerCard 
           playerData={playerData} 
           analysisTier={analysisTier} 
           setAnalysisTier={setAnalysisTier} 
-          orderedTiers={orderedTiers} 
+          orderedTiers={orderedTiers}
+          isLoading={isLoading}
         />
       }
     </div>

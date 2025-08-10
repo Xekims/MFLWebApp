@@ -35,18 +35,45 @@ export async function assignSquad(payload) {
   return res.json();
 }
 
-export async function searchMarketplace(payload) {
-  const res = await fetch(`${API_URL}/market/search`, {
+export async function saveSquad(squadName, squadData) {
+  const res = await fetch(`${API_URL}/squads/save`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ squad_name: squadName, squad_data: squadData }),
   });
-  const data = await res.json();
   if (!res.ok) {
-    const detail = data.detail?.message || data.detail || 'An unknown error occurred.';
-    throw new Error(detail);
+    const errorData = await res.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(errorData.message || 'Failed to save squad');
   }
-  return data;
+  return res.json();
+}
+
+export async function searchMarketplace(params) {
+  const query = new URLSearchParams({
+    limit: 25,
+    type: 'PLAYER',
+    status: 'AVAILABLE',
+    ...params,
+    positions: params.positions ? params.positions.join(',') : undefined,
+    view: 'full'
+  }).toString();
+  const res = await fetch(`${EXTERNAL_API_URL}/listings?${query}`);
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(errorData.message || 'Failed to fetch marketplace listings');
+  }
+  return res.json();
+}
+
+export async function fetchPlayerAnalysis(playerId, tier) {
+  // Assuming an endpoint for player analysis exists on the external API
+  // This is a placeholder and might need adjustment based on actual API capabilities
+  const res = await fetch(`${EXTERNAL_API_URL}/player/${playerId}/analysis?tier=${tier}`);
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ message: 'Unknown error' }));
+    throw new Error(errorData.message || 'Failed to fetch player analysis');
+  }
+  return res.json();
 }
 
 export async function fetchPlayerCardAnalysis(playerId) {
