@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import * as api from './api';
+import PlayerDetailModal from './PlayerDetailModal';
 
 const attributeMap = {
   PAC: { label: 'PAC', key: 'pace' }, SHO: { label: 'SHO', key: 'shooting' }, PAS: { label: 'PAS', key: 'passing' },
@@ -9,6 +10,8 @@ const attributeMap = {
   GK:  { label: 'GK', key: 'goalkeeping' },
 };
 const defaultAttributeOrder = ['PAC', 'SHO', 'PAS', 'DRI', 'DEF', 'PHY', 'GK'];
+
+
 
 const getAttributeStyle = (value) => {
   let backgroundColor, color;
@@ -49,6 +52,7 @@ export default function Marketplace() {
   const [attributeOrder, setAttributeOrder] = useState(defaultAttributeOrder);
   const [tierThresholds, setTierThresholds] = useState({}); // New state variable
 
+  const [openPlayerId, setOpenPlayerId] = useState(null);
   useEffect(() => {
     (async () => {
       try {
@@ -164,11 +168,9 @@ export default function Marketplace() {
   };
   const handleSortByFitScore = () => setResults([...results].sort((a, b) => b.player.metadata.fit_score - a.player.metadata.fit_score));
 
-  const handlePlayerClick = (playerListing) => {
-    if (!playerListing.player?.id) return;
-    setAnalysisTier(tier); // Set initial tier from search
-    setAnalyzedPlayer(playerListing.player);
-    fetchAnalysis(playerListing.player.id, tier);
+  const handlePlayerClick = (listing) => {
+    const id = listing?.player?.id;
+    if (id) setOpenPlayerId(id);
   };
 
   const fetchAnalysis = async (playerId, tierToAnalyze) => {
@@ -264,55 +266,12 @@ export default function Marketplace() {
         </section>
       )}
 
-      {analyzedPlayer && (
-        <div className="modal-overlay" onClick={() => setAnalyzedPlayer(null)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close-btn" onClick={() => setAnalyzedPlayer(null)}>X</button>
-            
-            <div className="modal-content">
-              {analysisData && analysisData.player_attributes && (
-                <div className="player-stat-card">
-                  <div className="overall">{analysisData.player_attributes.overall}</div>
-                  <h3>{analysisData.player_attributes.firstName} {analysisData.player_attributes.lastName}</h3>
-                  <p>Age: {analysisData.player_attributes.age} &nbsp;&bull;&nbsp; {analysisData.player_attributes.positions.join(', ')}</p>
-                  <div className="player-stat-grid">
-                    <StatDisplay label="Pace" value={analysisData.player_attributes.pace} />
-                    <StatDisplay label="Shooting" value={analysisData.player_attributes.shooting} />
-                    <StatDisplay label="Passing" value={analysisData.player_attributes.passing} />
-                    <StatDisplay label="Dribbling" value={analysisData.player_attributes.dribbling} />
-                    <StatDisplay label="Defense" value={analysisData.player_attributes.defense} />
-                    <StatDisplay label="Physical" value={analysisData.player_attributes.physical} />
-                  </div>
-                </div>
-              )}
-              <div className="role-analysis">
-                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                  <h4>Role Analysis</h4>
-                  <select value={analysisTier} onChange={handleTierChange}>
-                    {allTiers.map(t => (<option key={t} value={t}>{t}</option>))}
-                  </select>
-                </div>
-                {isAnalysisLoading && <div style={{padding: '2rem', textAlign: 'center'}}>Loading...</div>}
-                {analysisError && <div style={{padding: '2rem', textAlign: 'center', color: 'var(--mikado-yellow)'}}>{analysisError}</div>}
-                {!isAnalysisLoading && !analysisError && analysisData && (
-                  <>
-                    {analysisData.best_role ? (
-                      <p><strong>Best Role:</strong> {analysisData.best_role.role} <span>({analysisData.best_role.score})</span></p>
-                    ) : (
-                      <p>No suitable roles found for this tier.</p>
-                    )}
-                    <h5>All Positive Roles:</h5>
-                    <ul>
-                      {analysisData.positive_roles.map(r => (
-                        <li key={r.role}>{r.role} <span>{r.score} ({r.label})</span></li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+      {openPlayerId && (
+        <PlayerDetailModal
+          playerId={openPlayerId}
+          orderedTiers={allTiers}
+          onClose={() => setOpenPlayerId(null)}
+        />
       )}
     </div>
   );
