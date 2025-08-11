@@ -31,16 +31,11 @@ export async function fetchTiers() {
   return jsonOrThrow(res, "Failed to fetch tiers");
 }
 
-// Return { formations: ["4-3-3", ...] }
 export async function fetchFormations() {
   const res = await fetch(`${API_URL}/formations`);
   const data = await jsonOrThrow(res, "Failed to fetch formations");
-  if (Array.isArray(data)) {
-    return { formations: data };
-  }
-  if (data && typeof data === "object") {
-    return { formations: Object.keys(data) };
-  }
+  if (Array.isArray(data)) return { formations: data };
+  if (data && typeof data === "object") return { formations: Object.keys(data) };
   return { formations: [] };
 }
 
@@ -49,7 +44,7 @@ export async function fetchFormationMap(formationName) {
   return jsonOrThrow(res, "Failed to fetch formation map");
 }
 
-// ---------- Marketplace ----------
+// ---------- Marketplace: BUY (listings) ----------
 export async function searchMarketplace(params) {
   const { role_name, auth_token, tier, sortBy, sortOrder, ...filters } = params;
 
@@ -64,7 +59,7 @@ export async function searchMarketplace(params) {
         auth_token,
         sort_by: sortBy,
         sort_order: sortOrder,
-        ...filters, // <-- fixed spread
+        ...filters,
       }),
     });
     return jsonOrThrow(res, "Marketplace search via backend failed");
@@ -102,6 +97,44 @@ export async function searchMarketplace(params) {
   const qs = new URLSearchParams(queryParams).toString();
   const res = await fetch(`${EXTERNAL_API_URL}/listings?${qs}`);
   return jsonOrThrow(res, "Failed to fetch marketplace listings");
+}
+
+// ---------- Marketplace: LOAN (players) ----------
+export async function searchLoans(params) {
+  const { sortBy, sortOrder, ...filters } = params;
+
+  // sensible defaults for "loanable"
+  const queryParams = {
+    limit: 50,
+    sorts: sortBy || "metadata.overall",
+    sortsOrders: sortOrder || "DESC",
+    excludingMflOwned: true,
+    isFreeAgent: true,
+    offerStatuses: 2,              // loanable
+    ownerLastActivity: "lastWeek", // active owners
+  };
+
+  // optional filters mirrored from BUY flow (players endpoint accepts these too)
+  if (filters.positions && filters.positions.length > 0) {
+    queryParams.positions = Array.isArray(filters.positions)
+      ? filters.positions.join(",")
+      : filters.positions;
+  }
+  [
+    "paceMin",
+    "shootingMin",
+    "passingMin",
+    "dribblingMin",
+    "defenseMin",
+    "physicalMin",
+    "goalkeepingMin",
+  ].forEach((k) => {
+    if (filters[k] !== undefined) queryParams[k] = filters[k];
+  });
+
+  const qs = new URLSearchParams(queryParams).toString();
+  const res = await fetch(`${EXTERNAL_API_URL}/players?${qs}`);
+  return jsonOrThrow(res, "Failed to fetch loanable players");
 }
 
 // ---------- Player analysis ----------

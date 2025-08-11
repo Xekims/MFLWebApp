@@ -11,6 +11,7 @@ import {
 } from "chart.js";
 import { Radar } from "react-chartjs-2";
 import RoleGrid from "./RoleGrid";
+import { getFlagUrlFromPlayer } from './flags';
 
 ChartJS.register(
   RadialLinearScale,
@@ -82,13 +83,7 @@ export default function PlayerCard({
     ? `https://d13e14gtps4iwl.cloudfront.net/players/v2/${id}/photo.webp`
     : "";
 
-  const flagCode =
-    playerData?.country_code ||
-    metadata?.country_code ||
-    (metadata?.nationalities?.[0] ? metadata.nationalities[0].slice(0, 2) : "");
-  const flagUrl = countryToFlagCode(flagCode)
-    ? `https://flagcdn.com/w40/${countryToFlagCode(flagCode)}.png`
-    : "";
+ const flagUrl = getFlagUrlFromPlayer(playerData);
 
   // Build radar labels & values together to ensure alignment
   const radarLabels = useMemo(() => ATTR_ORDER.map(a => a.short), []);

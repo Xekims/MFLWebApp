@@ -129,22 +129,26 @@ export default function Agency() {
                   <td>{(p.positions || []).join(', ')}</td>
                   <td>{p.bestTier}</td>
                   <td>{p.bestRole}</td>
-                  <td>
-                    <select
-                      value={p.assigned_club}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        handleClubAssignmentChange(p.id, e.target.value);
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="club-assign-select"
+                  <td
+                      data-label="Assigned Club"
+                      onClick={(e) => e.stopPropagation()} // don't open the modal when using the select
                     >
-                      <option value="Unassigned">Unassigned</option>
-                      {clubs.map(club => (
-                        <option key={club.club_name} value={club.club_name}>{club.club_name}</option>
-                      ))}
-                    </select>
-                  </td>
+                      <select
+                        className="ui-select select-sm"
+                        value={p.assigned_club === 'Unassigned' ? '' : p.assigned_club}
+                        onChange={(e) =>
+                          handleClubAssignmentChange(p.id, e.target.value || 'Unassigned')
+                        }
+                      >
+                        <option value="">— Unassigned —</option>
+                        {clubs.map((club) => (
+                          <option key={club.club_name} value={club.club_name}>
+                            {club.club_name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+
                 </tr>
               ))}
             </tbody>

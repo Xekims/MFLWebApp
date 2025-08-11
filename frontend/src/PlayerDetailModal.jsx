@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import * as api from './api';
 import PlayerCard from './PlayerCard';
 
+
 function PlayerDetailModal({ playerId, orderedTiers, onClose }) {
   const [playerData, setPlayerData] = useState(null);
   const [analysisTier, setAnalysisTier] = useState(orderedTiers?.[0] || 'Iron');
