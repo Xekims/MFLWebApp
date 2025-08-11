@@ -726,3 +726,24 @@ tbody tr:hover {
   background-size: 200% 100%; animation: shimmer 1.4s infinite;
 }
 @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* Sleek icon-inside-input style */
+.sidebar .player-search-form--icon { position: relative; }
+
+.sidebar .player-search-form--icon .player-search-input {
+  padding-right: 2.25rem; /* space for the icon button */
+}
+
+.sidebar .player-search-form--icon .player-search-button {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 34px;
+  width: 34px;
+  padding: 0;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}

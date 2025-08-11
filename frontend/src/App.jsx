@@ -21,18 +21,20 @@ function PlayerSearchBar() {
   };
 
   return (
-    <form onSubmit={handleSearch} className="player-search-form">
+    <form onSubmit={handleSearch} className="player-search-form player-search-form--icon">
       <input
         type="text"
         value={playerId}
         onChange={(e) => setPlayerId(e.target.value)}
         placeholder="Search Player ID..."
         className="player-search-input"
+        aria-label="Search Player ID"
       />
-      <button type="submit" className="player-search-button">
+      <button type="submit" className="player-search-button" aria-label="Search">
         <i className="fa-solid fa-search"></i>
       </button>
     </form>
+
   );
 }
 
