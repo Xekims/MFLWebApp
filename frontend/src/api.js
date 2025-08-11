@@ -50,7 +50,7 @@ export async function saveSquad(squadName, squadData) {
 
 export async function searchMarketplace(params) {
   // Destructure to separate known keys
-  const { role_name, auth_token, tier, ...filters } = params;
+  const { role_name, auth_token, tier, sortBy, sortOrder, ...filters } = params;
   
   // **Case 1: Role-specific search with auth_token (called from SquadPicker)**
   if (role_name && auth_token) {
@@ -58,11 +58,14 @@ export async function searchMarketplace(params) {
       const res = await fetch(`${API_URL}/market/search`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+         body: JSON.stringify({
           role_name: role_name,
-          tier: tier || "Iron",        // default to Iron if tier not provided
-          auth_token,
-          ...filters,
+          tier: tier || "Iron",
+          auth_token: auth_token,
+          sort_by: sortBy,
+          sort_order: sortOrder,
+          // forward all remaining filters (positions and *Min values)
+          ...filters
         })
       });
       if (!res.ok) {
@@ -85,6 +88,8 @@ export async function searchMarketplace(params) {
     status: 'AVAILABLE',
     view: 'full'
   };
+  if (sortBy)      queryParams.sorts = sortBy;        // e.g. 'listing.price'
+  if (sortOrder)   queryParams.sortsOrders = sortOrder; // 'ASC' or 'DESC'
   // Include positions filter if available
   if (filters.positions && filters.positions.length > 0) {
     // If positions is an array, join it; if it's already a string, use it directly

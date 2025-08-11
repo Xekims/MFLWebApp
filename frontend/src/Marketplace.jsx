@@ -36,6 +36,7 @@ export default function Marketplace() {
   const [authToken, setAuthToken] = useState('');
   const [tier, setTier] = useState('Iron');
   const [results, setResults] = useState([]);
+  const [lastQuery, setLastQuery] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   
@@ -137,8 +138,11 @@ export default function Marketplace() {
         tier: tier,              // Add tier
         positions,
         ...attributeMins, // Spread the calculated attribute minimums
+        sortBy: 'listing.price',
+        sortOrder: 'ASC',
       };
 
+      setLastQuery(searchParams);
       const data = await api.searchMarketplace(searchParams);
       setResults(data ?? []);
     } catch (err) {
@@ -149,7 +153,15 @@ export default function Marketplace() {
     }
   };
 
-  const handleSortByPrice = () => setResults([...results].sort((a, b) => a.price - b.price));
+  const handleSortByPrice = async () => {
+    if (!lastQuery) return;
+    const data = await api.searchMarketplace({
+      ...lastQuery,
+      sortBy: 'listing.price',
+      sortOrder: 'ASC',
+    });
+    setResults(data ?? []);
+  };
   const handleSortByFitScore = () => setResults([...results].sort((a, b) => b.player.metadata.fit_score - a.player.metadata.fit_score));
 
   const handlePlayerClick = (playerListing) => {

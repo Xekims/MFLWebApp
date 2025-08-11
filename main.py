@@ -364,6 +364,8 @@ class PlayerSearchRequest(BaseModel):
     defenseMin: Optional[int] = None
     physicalMin: Optional[int] = None
     goalkeepingMin: Optional[int] = None
+    sort_by: Optional[str] = None     # e.g. 'listing.price'
+    sort_order: Optional[str] = None  # 'ASC' or 'DESC'
 
 @app.post("/market/search")
 def search_market(req: PlayerSearchRequest):
@@ -376,6 +378,10 @@ def search_market(req: PlayerSearchRequest):
         "status": "AVAILABLE",
         "view": "full",
     }
+    if req.sort_by:
+        external_api_params["sorts"] = req.sort_by
+    if req.sort_order:
+        external_api_params["sortsOrders"] = (req.sort_order or "").upper()
     if req.positions:
         external_api_params["positions"] = ",".join(
             [p.strip().upper() for p in req.positions if p]
