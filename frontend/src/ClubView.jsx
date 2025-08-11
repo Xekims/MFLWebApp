@@ -30,12 +30,14 @@ const canonPos = (p) => {
   return x; // fallback
 };
 
-const normaliseFormationsList = (formationsPayload) => {
-  // backend returns a mapping of name -> slots
-  if (Array.isArray(formationsPayload)) return formationsPayload;
-  if (formationsPayload && typeof formationsPayload === "object") return Object.keys(formationsPayload);
+const normaliseFormationsList = (payload) => {
+  // Accept: ["4-3-3", ...] or { formations:[...] } or { "4-3-3": {...} }
+  if (!payload) return [];
+  const value = Array.isArray(payload) ? payload : (payload.formations ?? payload);
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === "object") return Object.keys(value);
   return [];
-};
+  };
 
 const getSlotPosition = (slotVal) => {
   if (!slotVal) return "";
@@ -287,35 +289,7 @@ export default function ClubView() {
   }, [clubName]);
 
   // when formation changes, fetch its map and seed roleMap and slotMeta
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      if (!selectedFormation) {
-        setRoleMap({});
-        setSlotMeta({});
-        return;
-      }
-      try {
-        const fm = await api.fetchFormationMap(selectedFormation);
-        // fm is an object: slot -> { position, role? }
-        const meta = {};
-        const initialRoleMap = {};
-        Object.entries(fm || {}).forEach(([slot, val]) => {
-          const pos = canonPos(getSlotPosition(val));
-          meta[slot] = pos;
-          const defaultRole = getSlotDefaultRole(val);
-          const fallback = (rolesByPosition[pos] && rolesByPosition[pos][0]) || "";
-          initialRoleMap[slot] = defaultRole || fallback || "";
-        });
-        if (mounted) {
-          setSlotMeta(meta);
-          setRoleMap(initialRoleMap);
-        }
-      } catch (e) {
-        if (mounted) setError(e?.message || "Failed to load formation map");
-      }
-    })();
-  }, [selectedFormation, rolesByPosition]);
+ 
 
   // ----- handlers -----
   const handleRemovePlayer = async (playerId) => {
@@ -330,6 +304,35 @@ export default function ClubView() {
       setError(e?.message || "Failed to remove player");
     }
   };
+
+// put this inside the ClubView component, near your other handlers
+const handleFormationChange = async (value) => {
+  const name = typeof value === "string" ? value : value?.target?.value || "";
+  setSelectedFormation(name);
+  setSimulationResult([]);
+  setRoleMap({});
+  setSlotMeta({});
+  if (!name) return;
+  try {
+    const fm = await api.fetchFormationMap(name);
+    const meta = {};
+    const rolesForSlots = {};
+    Object.entries(fm || {}).forEach(([slot, val]) => {
+      // val can be "CB" or { position:"CB", role:"CB Centre-Back" }
+      const positionRaw = (val && typeof val === "object") ? (val.position || val.Position) : val;
+      const pos = canonPos(positionRaw);
+      meta[slot] = pos;
+      const defaultRole = (val && typeof val === "object") ? (val.role || val.Role || val.defaultRole) : undefined;
+      const fallback = (rolesByPosition[pos] && rolesByPosition[pos][0]) || "";
+      rolesForSlots[slot] = defaultRole || fallback || "";
+    });
+    setSlotMeta(meta);
+    setRoleMap(rolesForSlots); // <— strings only
+  } catch (err) {
+    setError(err?.message || "Failed to load formation map");
+  }
+};
+
 
   const handleAddPlayers = async (playerIds) => {
     try {
@@ -408,9 +411,12 @@ export default function ClubView() {
                 onChange={e => setNameFilter(e.target.value)}
                 style={{ maxWidth: 220 }}
               />
-              <select value={posFilter} onChange={e => setPosFilter(e.target.value)}>
-                <option value="">All positions</option>
-                {Object.keys(rolesByPosition).map(p => <option key={p} value={p}>{p}</option>)}
+              <select
+                value={selectedFormation}
+                onChange={(e) => handleFormationChange(e.target.value)}
+>
+                <option value="">Select…</option>
+                {formations.map((f) => <option key={f} value={f}>{f}</option>)}
               </select>
             </>
           )}
@@ -418,7 +424,7 @@ export default function ClubView() {
           {activeTab === "tactics" && (
             <>
               <label>Formation:{" "}
-                <select value={selectedFormation} onChange={e => setSelectedFormation(e.target.value)}>
+                <select value={selectedFormation} onChange={e => handleFormationChange(e.target.value)}>
                   <option value="">Select…</option>
                   {formations.map(f => <option key={f} value={f}>{f}</option>)}
                 </select>
