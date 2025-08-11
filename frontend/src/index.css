@@ -301,7 +301,7 @@ tbody tr:hover {
 }
 
 .club-card {
-    background-color: var(--background-secondary);
+    background-color: var(--background-tertiary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 1.5rem;
@@ -334,7 +334,7 @@ tbody tr:hover {
     border-radius: 12px;
     font-size: 0.8rem;
     font-weight: bold;
-    align-self: center;
+    align-self: start;
     margin-top: 1rem;
 }
 
@@ -678,3 +678,51 @@ tbody tr:hover {
 .club-themed .role-tile.strong-role .role-title {
   color: var(--club-main-color, var(--accent-primary));
 }
+
+/* Tabs */
+.tabs {
+  display: flex; gap: .5rem; margin-bottom: .75rem;
+}
+.tabs button {
+  background: var(--background-tertiary); border: 1px solid var(--border-color);
+  padding: .5rem .75rem; border-radius: 8px;
+}
+.tabs button.active { background: var(--accent-primary); color: var(--text-primary); }
+
+/* Sticky toolbar */
+.sticky-toolbar {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--background-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px; padding: .75rem 1rem; margin-bottom: 1rem;
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+}
+
+/* Split layout */
+.two-col {
+  display: grid; grid-template-columns: 1fr; gap: 1rem;
+}
+@media (min-width: 1100px) {
+  .two-col { grid-template-columns: 7fr 5fr; }
+}
+.col { max-height: calc(100vh - 220px); overflow: auto; }
+
+/* Compact tables with sticky headers */
+.table-compact th, .table-compact td { padding: .5rem .6rem; }
+.table-sticky thead th { position: sticky; top: 0; z-index: 1; }
+
+/* Inline icon button */
+.icon-btn { padding: .2rem .5rem; line-height: 1; }
+
+/* Accordion */
+.accordion summary { cursor: pointer; padding: .5rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--background-tertiary); }
+.accordion[open] summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.accordion > *:not(summary) { padding: .5rem; border: 1px solid var(--border-color); border-top: none; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; }
+
+/* Skeletal loader */
+.skeleton-table {
+  height: 220px; border: 1px solid var(--border-color); border-radius: 8px;
+  background: linear-gradient(90deg, var(--background-main) 0%, #0b1722 50%, var(--background-main) 100%);
+  background-size: 200% 100%; animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }

@@ -26,9 +26,12 @@ export default function Clubs() {
       ]);
       const tiersData = await tiersResponse.json();
       setClubs(clubsData);
-      setTiers(tiersData.tiers);
-      if (tiersData.tiers?.length > 0) {
-        setNewClubTier(tiersData.tiers[0]);
+      const tierList = Array.isArray(tiersData.tiers)
+        ? tiersData.tiers
+        : Object.keys(tiersData.tiers || {});
+      setTiers(tierList);
+      if (tierList.length > 0) {
+        setNewClubTier(tierList[0]);
       }
     } catch(err) {
       console.error("Failed to fetch initial data", err);

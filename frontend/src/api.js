@@ -61,7 +61,8 @@ export async function searchMarketplace(params) {
         body: JSON.stringify({
           role_name: role_name,
           tier: tier || "Iron",        // default to Iron if tier not provided
-          auth_token: auth_token
+          auth_token,
+          ...filters,
         })
       });
       if (!res.ok) {

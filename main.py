@@ -368,33 +368,32 @@ class PlayerSearchRequest(BaseModel):
 @app.post("/market/search")
 def search_market(req: PlayerSearchRequest):
     headers = {"Authorization": f"Bearer {req.auth_token}"}
-    
-    # Build query parameters for the external API
+
+    # Build external API query
     external_api_params = {
         "limit": 50,
         "type": "PLAYER",
         "status": "AVAILABLE",
-        "view": "full"
+        "view": "full",
     }
-
-    # Temporarily removed all filters from external_api_params
-    # if req.positions:
-    #     external_api_params["positions"] = ",".join(req.positions)
-
-    # if req.paceMin is not None:
-    #     external_api_params["paceMin"] = req.paceMin
-    # if req.shootingMin is not None:
-    #     external_api_params["shootingMin"] = req.shootingMin
-    # if req.passingMin is not None:
-    #     external_api_params["passingMin"] = req.passingMin
-    # if req.dribblingMin is not None:
-    #     external_api_params["dribblingMin"] = req.dribblingMin
-    # if req.defenseMin is not None:
-    #     external_api_params["defenseMin"] = req.defenseMin
-    # if req.physicalMin is not None:
-    #     external_api_params["physicalMin"] = req.physicalMin
-    # if req.goalkeepingMin is not None:
-    #     external_api_params["goalkeepingMin"] = req.goalkeepingMin
+    if req.positions:
+        external_api_params["positions"] = ",".join(
+            [p.strip().upper() for p in req.positions if p]
+        )
+    if req.paceMin is not None:
+        external_api_params["paceMin"] = req.paceMin
+    if req.shootingMin is not None:
+        external_api_params["shootingMin"] = req.shootingMin
+    if req.passingMin is not None:
+        external_api_params["passingMin"] = req.passingMin
+    if req.dribblingMin is not None:
+        external_api_params["dribblingMin"] = req.dribblingMin
+    if req.defenseMin is not None:
+        external_api_params["defenseMin"] = req.defenseMin
+    if req.physicalMin is not None:
+        external_api_params["physicalMin"] = req.physicalMin
+    if req.goalkeepingMin is not None:
+        external_api_params["goalkeepingMin"] = req.goalkeepingMin
 
     try:
         r = requests.get(MARKETPLACE_API, headers=headers, params=external_api_params, timeout=30)
@@ -403,42 +402,54 @@ def search_market(req: PlayerSearchRequest):
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=400, detail=f"Failed to fetch marketplace listings: {e}")
 
-    # Fetch all players once
-    all_players_df = fetch_players()
-    if all_players_df.empty:
-        return []
-
     results = []
-    for listing in listings:
-        player_id = listing.get("id")
-        if player_id is None:
+    for listing in listings or []:
+        player = (listing or {}).get("player") or {}
+        meta = player.get("metadata") or {}
+        player_id = player.get("id")
+        if player_id is None or not meta:
             continue
-        
-        # Get player data from the all_players_df
-        player_row = all_players_df[all_players_df['id'] == player_id]
-        if player_row.empty:
-            continue # Skip if player data not found (shouldn't happen if external API is consistent)
 
-        player_series = player_row.iloc[0] # Get the first (and only) row as a Series
-        
-        # Apply backend filtering based on role and tier fit
+        # Normalise to the fields calc_fit expects
+        positions_raw = meta.get("positions", [])
+        positions_norm = [(p or "").strip().upper() for p in positions_raw]
+        player_dict = {
+            "id": player_id,
+            "firstName": meta.get("firstName", ""),
+            "lastName": meta.get("lastName", ""),
+            "age": meta.get("age", 0),
+            "positions": positions_norm,
+            "overall": meta.get("overall", 0),
+            "pace": meta.get("pace", 0),
+            "shooting": meta.get("shooting", 0),
+            "passing": meta.get("passing", 0),
+            "dribbling": meta.get("dribbling", 0),
+            "defense": meta.get("defense", 0),
+            "physical": meta.get("physical", 0),
+            "goalkeeping": meta.get("goalkeeping", 0),
+        }
+        player_series = pd.Series(player_dict)
+
+        # Fit for requested role/tier using TIER_THRESH + role Attribute1..4
         score, label, _ = calc_fit(player_series, req.role_name, req.tier)
-        
-        # Only include players with a positive fit score
+
         if score >= 0:
-            player_data = player_series.to_dict()
-            player_data["fit_score"] = score
-            player_data["fit_label"] = label
-            
+            player_data = {**player_dict, "fit_score": int(score), "fit_label": label}
             results.append({
                 "listingResourceId": listing.get("listingResourceId"),
+                "status": listing.get("status"),
                 "price": listing.get("price"),
                 "player": {
                     "id": player_id,
                     "metadata": player_data
-                }
+                },
+                "sellerAddress": listing.get("sellerAddress"),
+                "sellerName": listing.get("sellerName"),
+                "createdDateTime": listing.get("createdDateTime"),
             })
+
     return results
+
 
 @app.post("/players/assign")
 def assign_player_club(req: PlayerAssignmentRequest):

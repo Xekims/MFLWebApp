@@ -1,325 +1,556 @@
 // file: frontend/src/ClubView.jsx
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
-import * as api from './api';
+import React, { useEffect, useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
+import * as api from "./api";
 
-// --- Reusable Add Players Modal ---
-const AddPlayerModal = ({ onAdd, onCancel, clubRosterIds }) => {
-    const [activeTab, setActiveTab] = useState('agency');
-    const [agencyPlayers, setAgencyPlayers] = useState([]);
-    const [selectedPlayers, setSelectedPlayers] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [sortConfig, setSortConfig] = useState({ key: 'overall', direction: 'descending' });
-
-    useEffect(() => {
-        (async () => {
-            const allOwned = await api.fetchOwnedPlayers();
-            // Filter for players who are unassigned OR already in the current roster
-            const available = allOwned.filter(p => p.assigned_club === "Unassigned" || clubRosterIds.includes(p.id));
-            setAgencyPlayers(available);
-            setIsLoading(false);
-        })();
-    }, [clubRosterIds]);
-
-    const sortedAgencyPlayers = useMemo(() => {
-        let sortablePlayers = [...players];
-        if (sortConfig.key) {
-            sortablePlayers.sort((a, b) => {
-                if (a[sortConfig.key] < b[sortConfig.key]) {
-                    return sortConfig.direction === 'ascending' ? -1 : 1;
-                }
-                if (a[sortConfig.key] > b[sortConfig.key]) {
-                    return sortConfig.direction === 'ascending' ? 1 : -1;
-                }
-                return 0;
-            });
-        }
-        return sortablePlayers;
-    }, [agencyPlayers, sortConfig]);
-
-    const requestSort = (key) => {
-        let direction = 'ascending';
-        if (sortConfig.key === key && sortConfig.direction === 'ascending') {
-            direction = 'descending';
-        }
-        setSortConfig({ key, direction });
-    };
-
-    const getSortIndicator = (key) => {
-        if (sortConfig.key !== key) return null;
-        return sortConfig.direction === 'ascending' ? ' ▲' : ' ▼';
-    };
-
-    const handleSelectPlayer = (playerId) => {
-        if (selectedPlayers.includes(playerId)) {
-            setSelectedPlayers(selectedPlayers.filter(id => id !== playerId));
-        } else {
-            setSelectedPlayers([...selectedPlayers, playerId]);
-        }
-    };
-    
-    const handleSave = () => {
-        onAdd(selectedPlayers);
-    };
-
-    return (
-        <div className="modal-overlay">
-            <div className="modal modal-md">
-                <div className="modal-header">
-                    <h3>Add Players to Roster</h3>
-                </div>
-                <div className="modal-body">
-                    {isLoading ? <p>Loading available players...</p> : (
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Select</th>
-                                    <th>Name</th>
-                                    <th onClick={() => requestSort('overall')} style={{cursor: 'pointer'}}>
-                                        Overall{getSortIndicator('overall')}
-                                    </th>
-                                    <th>Positions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {sortedAgencyPlayers.map(p => (
-                                    <tr key={p.id}>
-                                        <td><input type="checkbox" checked={selectedPlayers.includes(p.id)} onChange={() => handleSelectPlayer(p.id)} /></td>
-                                        <td>{p.firstName} {p.lastName}</td>
-                                        <td>{p.overall}</td>
-                                        <td>{p.positions.join(', ')}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    )}
-                </div>
-                <div className="modal-footer">
-                    <button onClick={onCancel}>Cancel</button>
-                    <button onClick={handleSave}>Add Selected Players</button>
-                </div>
-            </div>
-        </div>
-    );
+// ---------- Small helpers ----------
+const normaliseTierList = (tiersPayload) => {
+  // backend returns { tiers: {Iron: [...], Bronze: [...] } } or { tiers: ["Iron", ...] }
+  const mapOrArr = tiersPayload?.tiers;
+  if (Array.isArray(mapOrArr)) return mapOrArr;
+  if (mapOrArr && typeof mapOrArr === "object") return Object.keys(mapOrArr);
+  return [];
 };
 
+// Turn "RCB", "LCM", "RAM", "DM", "AM", "CB2" into the role key we store in roles.json
+const canonPos = (p) => {
+  let x = String(p || "").toUpperCase().replace(/\s+/g, "");
+  x = x.replace(/\d+$/,""); // strip trailing numbers like "CB1"
+  const BASE = new Set(["GK","CB","LB","RB","LWB","RWB","CDM","CM","CAM","LM","RM","LW","RW","CF","ST"]);
+  if (BASE.has(x)) return x;
+  // strip leading side markers
+  if ((x.startsWith("L") || x.startsWith("R")) && BASE.has(x.slice(1))) return x.slice(1);
+  // common synonyms
+  if (x === "DM") return "CDM";
+  if (x === "AM") return "CAM";
+  // side + mid combos
+  const sideStripped = (x.startsWith("L") || x.startsWith("R")) ? x.slice(1) : x;
+  if (BASE.has(sideStripped)) return sideStripped;
+  return x; // fallback
+};
 
-export default function ClubView() {
-  const { clubName } = useParams();
-  const [rosterIds, setRosterIds] = useState([]);
-  const [rosterPlayers, setRosterPlayers] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
+const normaliseFormationsList = (formationsPayload) => {
+  // backend returns a mapping of name -> slots
+  if (Array.isArray(formationsPayload)) return formationsPayload;
+  if (formationsPayload && typeof formationsPayload === "object") return Object.keys(formationsPayload);
+  return [];
+};
 
-  // --- States for the Tactics Simulator ---
-  const [allTiers, setAllTiers] = useState([]);
-  const [formations, setFormations] = useState([]);
-  const [allRoles, setAllRoles] = useState([]);
-  const [selectedFormation, setSelectedFormation] = useState("");
-  const [tier, setTier] = useState("Iron");
-  const [roleMap, setRoleMap] = useState({});
-  const [simulationResult, setSimulationResult] = useState([]);
+const getSlotPosition = (slotVal) => {
+  if (!slotVal) return "";
+  return (
+    slotVal.position ||
+    slotVal.Position ||
+    slotVal.pos ||
+    slotVal.rolePosition ||
+    ""
+  );
+};
 
-  const fetchData = async () => {
-    try {
-      setIsLoading(true);
-      setError('');
+const getSlotDefaultRole = (slotVal) => {
+  if (!slotVal) return "";
+  return slotVal.role || slotVal.Role || slotVal.defaultRole || "";
+};
 
-      // Fetch all data concurrently for better performance
-      const [clubData, formList, rolesList, tiersResponse] = await Promise.all([
-        api.fetchClubByName(clubName),
-        api.fetchFormations(),
-        api.fetchRoles(),
-        fetch('http://127.0.0.1:8000/tiers')
-      ]);
-
-      const tiersData = await tiersResponse.json();
-      const availableTiers = tiersData.tiers ?? [];
-      setAllTiers(availableTiers);
-
-      if (clubData) {
-        const rosterIdList = clubData.roster || [];
-        setRosterIds(rosterIdList);
-
-        if (rosterIdList.length > 0) {
-          const players = await api.fetchPlayersByIds(rosterIdList);
-          setRosterPlayers(players);
-        } else {
-          setRosterPlayers([]);
-        }
-
-        // Set the tier from the club, but validate it against the available tiers
-        if (clubData.tier && availableTiers.includes(clubData.tier)) {
-          setTier(clubData.tier);
-        } else if (availableTiers.length > 0) {
-          setTier(availableTiers[0]); // Default to the first available tier
-        }
-      } else {
-        setRosterPlayers([]);
-        setRosterIds([]);
-        setError(`Club "${clubName}" not found.`);
-      }
-
-      setFormations(formList ? Object.keys(formList) : []);
-      setAllRoles(rolesList ?? []);
-    } catch(err) {
-      console.error("Failed to load club data", err);
-      setError("Could not load club data. It may have been deleted or the server is unavailable.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+// ---------- Add Players Modal ----------
+const AddPlayerModal = ({ onAdd, onCancel, existingIds, clubName }) => {
+  const [agencyPlayers, setAgencyPlayers] = useState([]);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [sortConfig, setSortConfig] = useState({ key: "overall", direction: "descending" });
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
 
   useEffect(() => {
-    fetchData();
-  }, [clubName]);
-
-  const rolesByPosition = useMemo(() => {
-    const grouped = {};
-    for (const role of allRoles) {
-      const pos = role.Position;
-      if (!grouped[pos]) grouped[pos] = [];
-      grouped[pos].push(role.Role || role.RoleType);
-    }
-    return grouped;
-  }, [allRoles]);
-
-  async function handleFormationChange(e) {
-    const name = e.target.value;
-    setSelectedFormation(name);
-    setSimulationResult([]);
-    if (!name) {
-      setRoleMap({});
-      return;
-    }
-    try {
-      const formationData = await api.fetchFormationMap(name);
-      if (formationData) {
-        const initialRoleMap = {};
-        for (const [slot, position] of Object.entries(formationData)) {
-          const rolesForPosition = rolesByPosition[position] || [];
-          initialRoleMap[slot] = {
-            position: position,
-            role: rolesForPosition.length > 0 ? rolesForPosition[0] : null,
-          };
-        }
-        setRoleMap(initialRoleMap);
-      } else {
-        setRoleMap({});
-      }
-    } catch (err) {
-      console.error(err);
-      setRoleMap({});
-    }
-  }
-
-  function handleRoleChange(slot, newRole) {
-    setRoleMap(prevMap => ({ ...prevMap, [slot]: { ...prevMap[slot], role: newRole } }));
-  }
-
-  const handleRunSimulation = async () => {
-    const simpleRoleMap = Object.entries(roleMap).reduce((acc, [slot, data]) => {
-      acc[slot] = data.role;
-      return acc;
-    }, {});
-    try {
-      const res = await api.runSimulation({ player_ids: rosterIds, role_map: simpleRoleMap, tier });
-      setSimulationResult(res.squad);
-    } catch(err) {
-      alert("Failed to run simulation.");
-    }
-  };
-  
-  const handleAddPlayers = async (selectedPlayerIds) => {
-      const newRoster = [...new Set([...rosterIds, ...selectedPlayerIds])];
+    let mounted = true;
+    (async () => {
       try {
-          await api.updateClubRoster(clubName, newRoster);
-          setIsModalOpen(false);
-          fetchData(); // Refresh roster
-      } catch(err) {
-          alert("Failed to update roster");
+        setLoading(true);
+        const owned = await api.fetchOwnedPlayers();
+        // exclude already in roster
+        const available = (owned || []).filter(p => !existingIds.includes(p.id));
+        if (mounted) setAgencyPlayers(available);
+      } catch (e) {
+        if (mounted) setErr(e?.message || "Failed to load players");
+      } finally {
+        if (mounted) setLoading(false);
       }
+    })();
+    return () => { mounted = false; };
+  }, [existingIds]);
+
+  const requestSort = (key) => {
+    setSortConfig(prev => {
+      const direction = prev.key === key && prev.direction === "ascending" ? "descending" : "ascending";
+      return { key, direction };
+    });
   };
-  
-  const handleRemovePlayer = async (playerId) => {
-      const updatedRoster = rosterIds.filter(id => id !== playerId);
-      try {
-          await api.updateClubRoster(clubName, updatedRoster);
-          fetchData(); // Refresh roster
-      } catch(err) {
-          alert("Failed to update roster.");
+
+  const sortedAgencyPlayers = useMemo(() => {
+    const arr = [...agencyPlayers];
+    const { key, direction } = sortConfig;
+    arr.sort((a, b) => {
+      const av = a?.[key];
+      const bv = b?.[key];
+      if (typeof av === "number" && typeof bv === "number") {
+        return direction === "ascending" ? av - bv : bv - av;
       }
+      const as = String(av ?? "").toLowerCase();
+      const bs = String(bv ?? "").toLowerCase();
+      if (as < bs) return direction === "ascending" ? -1 : 1;
+      if (as > bs) return direction === "ascending" ? 1 : -1;
+      return 0;
+    });
+    return arr;
+  }, [agencyPlayers, sortConfig]);
+
+  const visiblePlayers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return sortedAgencyPlayers;
+    return sortedAgencyPlayers.filter(p =>
+      (`${p.firstName} ${p.lastName}`).toLowerCase().includes(q)
+      || (p.positions || []).join(",").toLowerCase().includes(q)
+    );
+  }, [sortedAgencyPlayers, search]);
+
+  const toggle = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const onConfirm = async () => {
+    await onAdd(Array.from(selectedIds));
   };
 
   return (
-    <div className="container">
-      <section>
-        <h1>{clubName}</h1>
-        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-            <h2>Roster ({rosterPlayers.length} / 25)</h2>
-            <button onClick={() => setIsModalOpen(true)}>Add Players to Roster</button>
-        </div>
-        {isLoading ? <p>Loading roster...</p> : (
-          <table>
-            <thead><tr><th>Name</th><th>Age</th><th>Overall</th><th>Positions</th><th>Best Role</th><th>Actions</th></tr></thead>
-            <tbody>
-              {rosterPlayers.map(p => (
-                <tr key={p.id}>
-                  <td>{p.firstName} {p.lastName}</td>
-                  <td>{p.age}</td>
-                  <td>{p.overall}</td>
-                  <td>{p.positions.join(', ')}</td>
-                  <td>{p.bestRole}</td>
-                  <td><button onClick={() => handleRemovePlayer(p.id)}>Remove</button></td>
+    <div className="modal-overlay">
+      <div className="modal">
+        <header className="modal-header">
+          <h3>Add players to {clubName}</h3>
+          <button onClick={onCancel} className="icon-btn" aria-label="Close">✕</button>
+        </header>
+
+        <div className="modal-body">
+          <div className="modal-toolbar">
+            <input
+              placeholder="Search players…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ maxWidth: 240 }}
+            />
+            <div style={{ marginLeft: "auto" }}>
+              <button onClick={() => setSelectedIds(new Set(visiblePlayers.map(p => p.id)))}>Select all</button>
+              <button onClick={() => setSelectedIds(new Set())} style={{ marginLeft: 8 }}>Clear</button>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="skeleton-table" />
+          ) : err ? (
+            <div className="error">{err}</div>
+          ) : (
+            <table className="table-compact table-sticky">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th onClick={() => requestSort("lastName")} style={{ cursor: "pointer" }}>Name</th>
+                  <th onClick={() => requestSort("overall")} style={{ cursor: "pointer" }}>Ovr</th>
+                  <th>Pos</th>
+                  <th>Assigned</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
-
-      <section>
-        <h2>Tactics Simulator</h2>
-        <p>Test different formations and roles using only the players in this club's roster.</p>
-        <div style={{ display: "flex", gap: 16, alignItems: "center", justifyContent: "center", flexWrap: 'wrap', marginBottom: '1rem' }}>
-          <label>Formation:<select value={selectedFormation} onChange={handleFormationChange}><option value="">Select…</option>{formations.map((f) => (<option key={f} value={f}>{f}</option>))}</select></label>
-          <label>Tier:
-            <select value={tier} onChange={(e) => setTier(e.target.value)}>
-              {allTiers.map(t => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-        {Object.keys(roleMap).length > 0 && (
-          <>
-            <table><thead><tr><th>Slot</th><th>Role</th></tr></thead><tbody>
-              {Object.entries(roleMap).map(([slot, slotData]) => {
-                const position = slotData.position;
-                const validRolesForSlot = position ? rolesByPosition[position] || [] : [];
-                return (
-                  <tr key={slot}><td>{slot}</td><td><select value={slotData.role} onChange={(e) => handleRoleChange(slot, e.target.value)} className="role-select">{validRolesForSlot.length > 0 ? (validRolesForSlot.map(roleOption => (<option key={roleOption} value={roleOption}>{roleOption}</option>))) : (<option value="N/A">No roles for {position}</option>)}</select></td></tr>
-                )
-              })}
-            </tbody></table>
-            <button onClick={handleRunSimulation} disabled={!selectedFormation} style={{width: '100%', marginTop: '1rem'}}>Simulate Best XI</button>
-          </>
-        )}
-        {simulationResult.length > 0 && (
-            <table>
-                <thead><tr><th>Slot</th><th>Role</th><th>Player</th><th>Fit</th><th>Label</th></tr></thead>
-                <tbody>
-                {simulationResult.map((row) => (
-                    <tr key={`${row.slot}-${row.player_id}`}><td>{row.slot}</td><td>{row.assigned_role}</td><td>{row.player_name || '—'}</td><td>{row.fit_score ?? ''}</td><td>{row.fit_label ?? ''}</td></tr>
-                ))}
-                </tbody>
+              </thead>
+              <tbody>
+                {visiblePlayers.map(p => {
+                  const name = `${p.firstName} ${p.lastName}`;
+                  const checked = selectedIds.has(p.id);
+                  return (
+                    <tr key={p.id} onClick={() => toggle(p.id)} style={{ cursor: "pointer" }}>
+                      <td><input type="checkbox" checked={checked} onChange={() => toggle(p.id)} /></td>
+                      <td>{name}</td>
+                      <td>{p.overall ?? ""}</td>
+                      <td>{(p.positions || []).join(", ")}</td>
+                      <td>{p.assigned_club || "Unassigned"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
             </table>
-        )}
-      </section>
+          )}
+        </div>
 
-      {isModalOpen && <AddPlayerModal onAdd={handleAddPlayers} onCancel={() => setIsModalOpen(false)} clubRosterIds={rosterIds} />}
+        <footer className="modal-footer">
+          <button onClick={onCancel}>Cancel</button>
+          <button onClick={onConfirm} disabled={selectedIds.size === 0}>Add {selectedIds.size || ""}</button>
+        </footer>
+      </div>
+    </div>
+  );
+};
+
+// ---------- Main Club View ----------
+export default function ClubView() {
+  const params = useParams();
+  const clubName = decodeURIComponent(params.club_name || params.name || params.clubName || "");
+
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const [clubTier, setClubTier] = useState("Iron");
+  const [allTiers, setAllTiers] = useState([]);
+
+  const [ownedPlayers, setOwnedPlayers] = useState([]);
+  const [rosterIds, setRosterIds] = useState([]);
+  const rosterPlayers = useMemo(
+    () => ownedPlayers.filter(p => rosterIds.includes(p.id)),
+    [ownedPlayers, rosterIds]
+  );
+
+  const [roles, setRoles] = useState([]); // from /roles
+  const rolesByPosition = useMemo(() => {
+    const map = {};
+    for (const r of roles || []) {
+      const pos = canonPos(r.Position);
+      const name = r.Role || r.RoleType || "";
+      if (!pos || !name) continue;
+      if (!map[pos]) map[pos] = [];
+      map[pos].push(name);
+    }
+    Object.keys(map).forEach(k => map[k].sort());
+    return map;
+  }, [roles]);
+
+  const [formations, setFormations] = useState([]);
+  const [selectedFormation, setSelectedFormation] = useState("");
+  const [slotMeta, setSlotMeta] = useState({});   // slot -> position
+  const [roleMap, setRoleMap] = useState({});     // slot -> role
+
+  const [activeTab, setActiveTab] = useState("roster");
+  const [nameFilter, setNameFilter] = useState("");
+  const [posFilter, setPosFilter] = useState("");
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const [simLoading, setSimLoading] = useState(false);
+  const [simulationResult, setSimulationResult] = useState([]);
+
+  // derived filtered roster
+  const filteredRoster = useMemo(() => {
+    const nameQ = nameFilter.trim().toLowerCase();
+    return rosterPlayers.filter(p => {
+      const nameOK = (`${p.firstName} ${p.lastName}`).toLowerCase().includes(nameQ);
+      const posOK = !posFilter || (p.positions || []).includes(posFilter);
+      return nameOK && posOK;
+    });
+  }, [rosterPlayers, nameFilter, posFilter]);
+
+  // load initial data
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const [club, tiersPayload, owned, rolesPayload, formationsPayload] = await Promise.all([
+          api.fetchClubByName(clubName),
+          api.fetchTiers(),
+          api.fetchOwnedPlayers(),
+          api.fetchRoles(),
+          api.fetchFormations(),
+        ]);
+
+        if (!club) throw new Error("Club not found");
+
+        const tierList = normaliseTierList(tiersPayload);
+        const clubTierInit = tierList.includes(club.tier) ? club.tier : (tierList[0] || "Iron");
+        if (mounted) {
+          setAllTiers(tierList);
+          setClubTier(clubTierInit);
+          setOwnedPlayers(owned || []);
+          setRosterIds(Array.isArray(club.roster) ? club.roster.map(Number) : []);
+          setRoles(Array.isArray(rolesPayload) ? rolesPayload : []);
+          setFormations(normaliseFormationsList(formationsPayload));
+        }
+      } catch (e) {
+        if (mounted) setError(e?.message || "Failed to load club data");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+
+    return () => { mounted = false; };
+  }, [clubName]);
+
+  // when formation changes, fetch its map and seed roleMap and slotMeta
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!selectedFormation) {
+        setRoleMap({});
+        setSlotMeta({});
+        return;
+      }
+      try {
+        const fm = await api.fetchFormationMap(selectedFormation);
+        // fm is an object: slot -> { position, role? }
+        const meta = {};
+        const initialRoleMap = {};
+        Object.entries(fm || {}).forEach(([slot, val]) => {
+          const pos = canonPos(getSlotPosition(val));
+          meta[slot] = pos;
+          const defaultRole = getSlotDefaultRole(val);
+          const fallback = (rolesByPosition[pos] && rolesByPosition[pos][0]) || "";
+          initialRoleMap[slot] = defaultRole || fallback || "";
+        });
+        if (mounted) {
+          setSlotMeta(meta);
+          setRoleMap(initialRoleMap);
+        }
+      } catch (e) {
+        if (mounted) setError(e?.message || "Failed to load formation map");
+      }
+    })();
+  }, [selectedFormation, rolesByPosition]);
+
+  // ----- handlers -----
+  const handleRemovePlayer = async (playerId) => {
+    try {
+      await api.updatePlayerAssignment({
+        player_id: playerId,
+        old_club_name: clubName,
+        new_club_name: "Unassigned",
+      });
+      setRosterIds(prev => prev.filter(id => id !== playerId));
+    } catch (e) {
+      setError(e?.message || "Failed to remove player");
+    }
+  };
+
+  const handleAddPlayers = async (playerIds) => {
+    try {
+      await Promise.all(playerIds.map(pid => {
+        const player = ownedPlayers.find(p => p.id === pid);
+        const oldClub = player?.assigned_club || "Unassigned";
+        return api.updatePlayerAssignment({
+          player_id: pid,
+          old_club_name: oldClub,
+          new_club_name: clubName,
+        });
+      }));
+      setRosterIds(prev => Array.from(new Set(prev.concat(playerIds))));
+      setIsModalOpen(false);
+    } catch (e) {
+      setError(e?.message || "Failed to add players");
+    }
+  };
+
+  const handleRoleChange = (slot, value) => {
+    setRoleMap(prev => ({ ...prev, [slot]: value }));
+  };
+
+  const handleRunSimulation = async () => {
+    try {
+      setSimLoading(true);
+      setSimulationResult([]);
+      const payload = {
+        player_ids: rosterIds,
+        role_map: roleMap,
+        tier: clubTier,
+      };
+      const res = await api.runSimulation(payload);
+      setSimulationResult(res?.squad || []);
+    } catch (e) {
+      setError(e?.message || "Simulation failed");
+    } finally {
+      setSimLoading(false);
+    }
+  };
+
+  // ----- render -----
+  if (loading) {
+    return (
+      <div className="page">
+        <h1>{clubName}</h1>
+        <div className="skeleton-table" />
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="page">
+        <h1>{clubName}</h1>
+        <div className="error">{error}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="page">
+      <h1>{clubName}</h1>
+
+      <div className="tabs">
+        <button className={activeTab === "roster" ? "active" : ""} onClick={() => setActiveTab("roster")}>Roster</button>
+        <button className={activeTab === "tactics" ? "active" : ""} onClick={() => setActiveTab("tactics")}>Tactics</button>
+      </div>
+
+      <div className="sticky-toolbar">
+        <div className="toolbar-left" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {activeTab === "roster" && (
+            <>
+              <input
+                placeholder="Search name…"
+                value={nameFilter}
+                onChange={e => setNameFilter(e.target.value)}
+                style={{ maxWidth: 220 }}
+              />
+              <select value={posFilter} onChange={e => setPosFilter(e.target.value)}>
+                <option value="">All positions</option>
+                {Object.keys(rolesByPosition).map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </>
+          )}
+
+          {activeTab === "tactics" && (
+            <>
+              <label>Formation:{" "}
+                <select value={selectedFormation} onChange={e => setSelectedFormation(e.target.value)}>
+                  <option value="">Select…</option>
+                  {formations.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </label>
+
+              <label style={{ marginLeft: 8 }}>Tier:{" "}
+                <select value={clubTier} onChange={e => setClubTier(e.target.value)}>
+                  {allTiers.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </label>
+            </>
+          )}
+        </div>
+
+        <div className="toolbar-right" style={{ display: "flex", gap: 8 }}>
+          {activeTab === "roster" && (
+            <button onClick={() => setIsModalOpen(true)}>Add players</button>
+          )}
+          {activeTab === "tactics" && (
+            <button onClick={handleRunSimulation} disabled={!selectedFormation || rosterIds.length === 0 || simLoading}>
+              {simLoading ? "Running…" : "Run simulation"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="two-col">
+        {activeTab === "roster" && (
+          <section className="col">
+            <h2>Roster ({filteredRoster.length} / 25)</h2>
+            {filteredRoster.length === 0 ? (
+              <p>No players in this view.</p>
+            ) : (
+              <table className="table-compact table-sticky">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Age</th>
+                    <th>Ovr</th>
+                    <th>Pos</th>
+                    <th>Best tier</th>
+                    <th>Best role</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRoster.map(p => (
+                    <tr key={p.id}>
+                      <td>{p.firstName} {p.lastName}</td>
+                      <td>{p.age ?? ""}</td>
+                      <td>{p.overall ?? ""}</td>
+                      <td>{(p.positions || []).join(", ")}</td>
+                      <td>{p.bestTier || ""}</td>
+                      <td>{p.bestRole || ""}</td>
+                      <td>
+                        <button className="icon-btn" title="Remove" onClick={() => handleRemovePlayer(p.id)}>✕</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+        )}
+
+        {activeTab === "tactics" && (
+          <section className="col">
+            <h2>Tactics simulator</h2>
+
+            {!selectedFormation ? (
+              <p>Select a formation to configure roles.</p>
+            ) : (
+              <>
+                <details open className="accordion">
+                  <summary>Edit roles</summary>
+                  <table className="table-compact">
+                    <thead><tr><th>Slot</th><th>Position</th><th>Role</th></tr></thead>
+                    <tbody>
+                      {Object.entries(slotMeta).map(([slot, pos]) => {
+                        const options = rolesByPosition[pos] || [];
+                        return (
+                          <tr key={slot}>
+                            <td>{slot}</td>
+                            <td>{pos || "—"}</td>
+                            <td>
+                              <select value={roleMap[slot] || ""} onChange={e => handleRoleChange(slot, e.target.value)}>
+                                {options.length === 0 && <option value="">No roles</option>}
+                                {options.map(rn => <option key={rn} value={rn}>{rn}</option>)}
+                              </select>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </details>
+
+                <div style={{ marginTop: 12 }}>
+                  <h3>Simulation result</h3>
+                  {simulationResult.length === 0 ? (
+                    <p>{simLoading ? "Calculating…" : "Run a simulation to see suggested lineup."}</p>
+                  ) : (
+                    <table className="table-compact table-sticky">
+                      <thead><tr><th>Slot</th><th>Role</th><th>Player</th><th>Fit</th><th>Label</th></tr></thead>
+                      <tbody>
+                        {simulationResult.map(row => (
+                          <tr key={`${row.slot}-${row.player_id || "none"}`}>
+                            <td>{row.slot}</td>
+                            <td>{row.assigned_role}</td>
+                            <td>{row.player_name || "—"}</td>
+                            <td>{row.fit_score ?? ""}</td>
+                            <td>{row.fit_label ?? ""}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </>
+            )}
+          </section>
+        )}
+      </div>
+
+      {isModalOpen && (
+        <AddPlayerModal
+          onAdd={handleAddPlayers}
+          onCancel={() => setIsModalOpen(false)}
+          existingIds={rosterIds}
+          clubName={clubName}
+        />
+      )}
     </div>
   );
 }

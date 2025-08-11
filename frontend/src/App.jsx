@@ -1,7 +1,7 @@
 // file: frontend/src/App.jsx
 import React, { useState } from "react";
 import { Routes, Route, NavLink, useNavigate } from "react-router-dom";
-import SquadPicker from "./SquadPicker";
+{/*import SquadPicker from "./SquadPicker";*/}
 import Marketplace from "./Marketplace";
 import Config from "./Config";
 import Agency from "./Agency";
@@ -54,7 +54,7 @@ export default function App() {
       </div>
       <div className="main-content">
         <Routes>
-          <Route path="/" element={<SquadPicker />} />
+          {/*<Route path="/" element={<SquadPicker />} />*/}
           <Route path="/market" element={<Marketplace />} />
           <Route path="/agency" element={<Agency />} />
           <Route path="/clubs" element={<Clubs />} />

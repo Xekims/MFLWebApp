@@ -127,11 +127,15 @@ export default function Marketplace() {
         }
       });
 
+      const positions =
+        currentRoleDetails.Position
+          ? [String(currentRoleDetails.Position).trim().toUpperCase()]
+          : [];
       const searchParams = {
         role_name: selectedRole, // Add role_name
         auth_token: authToken,   // Add auth_token
         tier: tier,              // Add tier
-        positions: currentRoleDetails.Positions,
+        positions,
         ...attributeMins, // Spread the calculated attribute minimums
       };
 
