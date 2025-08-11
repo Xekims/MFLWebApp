@@ -1,17 +1,12 @@
-// file: frontend/src/Config.jsx
+// frontend/src/Config.jsx
 import React, { useState, useEffect } from 'react';
 import * as api from './api';
 
-// --- Reusable Editor for a single Role (no changes) ---
 const RoleEditor = ({ role, onSave, onCancel, onDelete, attributes }) => {
   const [formData, setFormData] = useState(role);
   const isNew = !role.originalName;
-
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSave(formData);
-  };
+  const handleSubmit = (e) => { e.preventDefault(); onSave(formData); };
 
   return (
     <form onSubmit={handleSubmit} style={{ border: '1px solid var(--yale-blue)', padding: '1rem', borderRadius: '8px', marginTop: '1rem' }}>
@@ -21,7 +16,7 @@ const RoleEditor = ({ role, onSave, onCancel, onDelete, attributes }) => {
         <label>Position: <input name="Position" value={formData.Position} onChange={handleChange} required /></label>
         {[1, 2, 3, 4].map(i => (
           <label key={i}>Attribute {i}:
-            <select name={`Attribute${i}`} value={formData[`Attribute${i}`]} onChange={handleChange}>
+            <select name={`Attribute${i}`} value={formData[`Attribute${i}`] || ''} onChange={handleChange}>
               <option value="">None</option>
               {attributes.map(attr => <option key={attr} value={attr}>{attr}</option>)}
             </select>
@@ -39,19 +34,15 @@ const RoleEditor = ({ role, onSave, onCancel, onDelete, attributes }) => {
   );
 };
 
-// --- Reusable Editor for a single Formation (no changes) ---
 const FormationEditor = ({ formationName, formationData, allRoles, onSave, onCancel, onDelete, isNew = false }) => {
   const [name, setName] = useState(formationName);
   const [slots, setSlots] = useState(formationData);
 
   const handleRoleChange = (slotName, newRole) => {
-    setSlots(prevSlots => ({ ...prevSlots, [slotName]: newRole }));
+    setSlots(prev => ({ ...prev, [slotName]: newRole })); // <-- fixed spread
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSave(name, slots);
-  };
+  const handleSubmit = (e) => { e.preventDefault(); onSave(name, slots); };
 
   return (
     <form onSubmit={handleSubmit} style={{ border: '1px solid var(--yale-blue)', padding: '1rem', borderRadius: '8px', marginTop: '1rem' }}>
@@ -60,9 +51,9 @@ const FormationEditor = ({ formationName, formationData, allRoles, onSave, onCan
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
         {Object.entries(slots).map(([slotName, currentRole]) => (
           <label key={slotName}>{slotName}:
-            <select value={currentRole} onChange={(e) => handleRoleChange(slotName, e.target.value)}>
+            <select value={currentRole || ''} onChange={(e) => handleRoleChange(slotName, e.target.value)}>
               <option value="">- Unassigned -</option>
-              {allRoles.map(role => <option key={role.Role} value={role.Role}>{role.Role}</option>)}
+              {allRoles.map(r => <option key={r.Role} value={r.Role}>{r.Role}</option>)}
             </select>
           </label>
         ))}
@@ -78,30 +69,23 @@ const FormationEditor = ({ formationName, formationData, allRoles, onSave, onCan
   );
 };
 
-// --- Component for the initial creation of a formation (no changes) ---
 const NewFormationCreator = ({ onContinue, onCancel }) => {
   const [formationName, setFormationName] = useState('');
   const [slotInput, setSlotInput] = useState('');
   const [slots, setSlots] = useState([]);
 
   const handleAddSlot = () => {
-    const trimmedSlot = slotInput.trim().toUpperCase();
-    if (trimmedSlot && !slots.includes(trimmedSlot)) {
-      setSlots([...slots, trimmedSlot]);
+    const trimmed = slotInput.trim().toUpperCase();
+    if (trimmed && !slots.includes(trimmed)) {
+      setSlots(prev => [...prev, trimmed]);
       setSlotInput('');
     }
   };
-  
-  const handleRemoveSlot = (slotToRemove) => {
-    setSlots(slots.filter(slot => slot !== slotToRemove));
-  };
-  
+  const handleRemoveSlot = (s) => setSlots(prev => prev.filter(x => x !== s));
   const handleContinue = () => {
-    if (formationName && slots.length > 0) {
-      onContinue(formationName, slots);
-    } else {
-      alert('Please provide a formation name and add at least one slot.');
-    }
+    if (!formationName || slots.length === 0) return alert('Please provide a formation name and add at least one slot.');
+    const map = Object.fromEntries(slots.map(s => [s, ""]));
+    onContinue(formationName, map);
   };
 
   return (
@@ -145,60 +129,162 @@ export default function Config() {
   const [editingRole, setEditingRole] = useState(null);
   const [editingFormation, setEditingFormation] = useState(null);
   const [isAddingFormation, setIsAddingFormation] = useState(false);
-  
-  // This can be simplified, but for now we leave the functions inside
-  const fetchData = async () => { try { const r = await api.fetchRoles(); const fL = await api.fetchFormations(); const aD = await api.fetchAttributes(); setRoles(r); setAttributes(aD.attributes); const aF = {}; for (const fm of fL.formations) { aF[fm] = await api.fetchFormationMap(fm); } setFormations(aF); } catch (err) { console.error("Failed to load config data:", err); }};
-  useEffect(() => { fetchData(); }, []);
-  const handleSelectRoleToEdit = (roleName) => { if (!roleName) { setEditingRole(null); return; } const r = roles.find(r => r.Role === roleName); setEditingRole({ ...r, originalName: r.Role }); };
-  const handleAddNewRole = () => setEditingRole({ Role: '', Position: '', Attribute1: '', Attribute2: '', Attribute3: '', Attribute4: '' });
-  const handleSaveRole = async (roleData) => { try { if (editingRole.originalName) { await api.updateRole(editingRole.originalName, roleData); } else { await api.createRole(roleData); } setEditingRole(null); fetchData(); } catch (e) { console.error(e); alert(e.message); }};
-  const handleDeleteRole = async (roleName) => { if (window.confirm(`Are you sure you want to delete "${roleName}"?`)) { try { await api.deleteRole(roleName); setEditingRole(null); fetchData(); } catch (e) { console.error(e); alert(e.message); }}};
-  const handleSelectFormationToEdit = (formationName) => { if (!formationName) { setEditingFormation(null); return; } setEditingFormation({ name: formationName, data: formations[formationName], isNew: false }); };
-  const handleStartNewFormation = (name, slotList) => { const nFD = {}; slotList.forEach(s => { nFD[s] = ""; }); setEditingFormation({ name, data: nFD, isNew: true }); setIsAddingFormation(false); };
-  const handleSaveFormation = async (formationName, slots) => { try { if (editingFormation.isNew) { await api.createFormation(formationName, slots); } else { await api.updateFormation(formationName, slots); } setEditingFormation(null); fetchData(); } catch (e) { console.error(e); alert(e.message); }};
-  const handleDeleteFormation = async (formationName) => { if (window.confirm(`Are you sure you want to delete the "${formationName}" formation?`)) { try { await api.deleteFormation(formationName); setEditingFormation(null); fetchData(); } catch (e) { console.error(e); alert(e.message); }}};
+
+  const reload = async () => {
+    const [r, fL, aD] = await Promise.all([
+      api.fetchRoles(),
+      api.fetchFormations(),  // { formations: [...] }
+      api.fetchAttributes()
+    ]);
+    setRoles(r.map(rr => ({ ...rr, originalName: rr.Role || rr.RoleType })));
+    setAttributes(aD.attributes || []);
+    const maps = {};
+    for (const fm of (fL.formations || [])) {
+      maps[fm] = await api.fetchFormationMap(fm);
+    }
+    setFormations(maps);
+  };
+
+  useEffect(() => { reload().catch(console.error); }, []);
+
+  // ----- Role handlers -----
+  const handleSaveRole = async (data) => {
+    const isNew = !data.originalName;
+    const payload = {
+      Role: data.Role,
+      Position: data.Position,
+      Attribute1: data.Attribute1 || "",
+      Attribute2: data.Attribute2 || "",
+      Attribute3: data.Attribute3 || "",
+      Attribute4: data.Attribute4 || "",
+    };
+    try {
+      if (isNew) {
+        await fetch(`${API_URL}/roles`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      } else {
+        await fetch(`${API_URL}/roles/${encodeURIComponent(data.originalName)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      }
+      setEditingRole(null);
+      await reload();
+    } catch (e) {
+      alert(e.message || "Failed to save role");
+    }
+  };
+
+  const handleDeleteRole = async (name) => {
+    if (!window.confirm(`Delete role "${name}"?`)) return;
+    try {
+      await fetch(`${API_URL}/roles/${encodeURIComponent(name)}`, { method: 'DELETE' });
+      await reload();
+    } catch (e) {
+      alert(e.message || "Failed to delete role");
+    }
+  };
+
+  // ----- Formation handlers -----
+  const handleCreateFormation = (name, slotsMap) => {
+    setEditingFormation({ name, data: slotsMap, isNew: true });
+    setIsAddingFormation(false);
+  };
+
+  const handleSaveFormation = async (name, slots) => {
+    try {
+      const method = formations[name] ? 'PUT' : 'POST';
+      const url = method === 'POST' ? `${API_URL}/formations` : `${API_URL}/formations/${encodeURIComponent(name)}`;
+      const body = method === 'POST'
+        ? JSON.stringify({ formationName: name, roles: slots })
+        : JSON.stringify(slots);
+      await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body });
+      setEditingFormation(null);
+      await reload();
+    } catch (e) {
+      alert(e.message || "Failed to save formation");
+    }
+  };
+
+  const handleDeleteFormation = async (name) => {
+    if (!window.confirm(`Delete formation "${name}"?`)) return;
+    try {
+      await fetch(`${API_URL}/formations/${encodeURIComponent(name)}`, { method: 'DELETE' });
+      await reload();
+    } catch (e) {
+      alert(e.message || "Failed to delete formation");
+    }
+  };
+
+  const API_URL = "http://localhost:8000"; // local constant for fetch in this file
 
   return (
-    <div>
-      <h1>Configuration</h1>
+    <div className="container">
       <section>
-        <h2>Manage Roles</h2>
-        {/* --- THIS LOGIC IS NOW CORRECTED TO ALWAYS BE VISIBLE --- */}
-        {!editingRole && (
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
-                <select onChange={(e) => handleSelectRoleToEdit(e.target.value)} value={''}>
-                    <option value="">Select a role to edit...</option>
-                    {roles.map(role => <option key={role.Role} value={role.Role}>{role.Role}</option>)}
-                </select>
-                <button onClick={handleAddNewRole}>Add New Role</button>
-            </div>
-        )}
-        {editingRole && <RoleEditor role={editingRole} onSave={handleSaveRole} onCancel={() => setEditingRole(null)} onDelete={handleDeleteRole} attributes={attributes} />}
-      </section>
+        <h1>Config</h1>
 
-      <section style={{marginTop: '3rem'}}>
-        <h2>Manage Formations</h2>
-        {!editingFormation && !isAddingFormation && (
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
-            <select onChange={(e) => handleSelectFormationToEdit(e.target.value)} value={''}>
-              <option value="">Select a formation to edit...</option>
-              {Object.keys(formations).map(name => <option key={name} value={name}>{name}</option>)}
-            </select>
-            <button onClick={() => setIsAddingFormation(true)}>Add New Formation</button>
-          </div>
-        )}
-        
-        {isAddingFormation && <NewFormationCreator onContinue={handleStartNewFormation} onCancel={() => setIsAddingFormation(false)} />}
-        
-        {editingFormation && <FormationEditor 
-            formationName={editingFormation.name} 
-            formationData={editingFormation.data} 
-            allRoles={roles} 
-            onSave={handleSaveFormation} 
-            onCancel={() => setEditingFormation(null)} 
-            onDelete={handleDeleteFormation}
-            isNew={editingFormation.isNew}
-        />}
+        {/* Roles */}
+        <div style={{ marginTop: '2rem' }}>
+          <h2>Roles</h2>
+          {!editingRole ? (
+            <>
+              <button onClick={() => setEditingRole({ Role: '', Position: '', Attribute1: '', Attribute2: '', Attribute3: '', Attribute4: '' })}>
+                Add New Role
+              </button>
+              <ul style={{ marginTop: '1rem' }}>
+                {roles.map(r => (
+                  <li key={r.originalName} style={{ margin: '6px 0' }}>
+                    <strong>{r.Role}</strong> — {r.Position}
+                    <button style={{ marginLeft: 10 }} onClick={() => setEditingRole(r)}>Edit</button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <RoleEditor
+              role={editingRole}
+              onSave={handleSaveRole}
+              onCancel={() => setEditingRole(null)}
+              onDelete={handleDeleteRole}
+              attributes={attributes}
+            />
+          )}
+        </div>
+
+        {/* Formations */}
+        <div style={{ marginTop: '2rem' }}>
+          <h2>Formations</h2>
+          {!editingFormation ? (
+            <>
+              <button onClick={() => setIsAddingFormation(true)}>Add New Formation</button>
+              {isAddingFormation && (
+                <NewFormationCreator
+                  onContinue={handleCreateFormation}
+                  onCancel={() => setIsAddingFormation(false)}
+                />
+              )}
+              <ul style={{ marginTop: '1rem' }}>
+                {Object.keys(formations).map(name => (
+                  <li key={name} style={{ margin: '6px 0' }}>
+                    <strong>{name}</strong>
+                    <button style={{ marginLeft: 10 }} onClick={() => setEditingFormation({ name, data: formations[name], isNew: false })}>
+                      Edit
+                    </button>
+                    <button style={{ marginLeft: 10 }} onClick={() => handleDeleteFormation(name)}>
+                      Delete
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <FormationEditor
+              formationName={editingFormation.name}
+              formationData={editingFormation.data}
+              allRoles={roles}
+              onSave={handleSaveFormation}
+              onCancel={() => setEditingFormation(null)}
+              onDelete={handleDeleteFormation}
+              isNew={editingFormation.isNew}
+            />
+          )}
+        </div>
       </section>
     </div>
   );

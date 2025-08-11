@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import * as api from './api';
-import PlayerCard from './PlayerCard';  // Reusable component extracted from PlayerSearch
+import PlayerCard from './PlayerCard';
 
 function PlayerDetailModal({ playerId, orderedTiers, onClose }) {
   const [playerData, setPlayerData] = useState(null);
@@ -10,32 +10,46 @@ function PlayerDetailModal({ playerId, orderedTiers, onClose }) {
 
   useEffect(() => {
     if (!playerId) return;
-    setLoading(true);
-    setError('');
-    // Fetch full player details (card info and role analysis)
-    Promise.all([
-      api.fetchPlayerCardAnalysis(playerId),
-      api.fetchPlayerRoleAnalysis(playerId)
-    ]).then(([cardData, roleData]) => {
-      const combinedData = { ...cardData, ...roleData };
-      setPlayerData(combinedData);
-      // Set default tier to player's best tier if available
-      if (combinedData.overall_best_role?.tier) {
-        setAnalysisTier(combinedData.overall_best_role.tier);
+    let mounted = true;
+
+    (async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const [cardData, roleData] = await Promise.all([
+          api.fetchPlayerCardAnalysis(playerId),
+          api.fetchPlayerRoleAnalysis(playerId),
+        ]);
+
+        const combinedData = { ...cardData, ...roleData };
+        if (!mounted) return;
+
+        setPlayerData(combinedData);
+        if (combinedData.overall_best_role?.tier) {
+          setAnalysisTier(combinedData.overall_best_role.tier);
+        }
+      } catch (e) {
+        if (!mounted) return;
+        console.error('Failed to load player details:', e);
+        setError('Failed to load player details.');
+      } finally {
+        if (mounted) setLoading(false);
       }
-    }).catch(err => {
-      console.error('Failed to load player details:', err);
-      setError('Failed to load player details.');
-    }).finally(() => {
-      setLoading(false);
-    });
+    })();
+
+    // ✅ JS boolean
+    return () => {
+      mounted = false;
+    };
   }, [playerId]);
 
   if (!playerId) return null;
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" onClick={e => e.stopPropagation()}>
-        <button className="modal-close-btn" onClick={onClose}>X</button>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-close-btn" onClick={onClose}>×</button>
+
         {loading ? (
           <div style={{ padding: '2rem', textAlign: 'center' }}>Loading...</div>
         ) : error ? (
@@ -43,13 +57,12 @@ function PlayerDetailModal({ playerId, orderedTiers, onClose }) {
             {error}
           </div>
         ) : (
-          /* Render full player details card */
-          <PlayerCard 
-            playerData={playerData} 
-            analysisTier={analysisTier} 
-            setAnalysisTier={setAnalysisTier} 
-            orderedTiers={orderedTiers} 
-            isLoading={false} 
+          <PlayerCard
+            playerData={playerData}
+            analysisTier={analysisTier}
+            setAnalysisTier={setAnalysisTier}
+            orderedTiers={orderedTiers}
+            isLoading={false}
           />
         )}
       </div>

@@ -1,65 +1,158 @@
-# file: main.py
-
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Dict, List, Any, Optional
 import requests
 import json
 import pandas as pd
-from typing import Dict, List, Any, Optional
+import os
 
-# --- Config ---
+# ----------------------------
+# Config / constants
+# ----------------------------
 ROLES_PATH = "roles.json"
 FORMATIONS_PATH = "formations.json"
 SQUADS_PATH = "squads.json"
+
 OWNER_WALLET = "0x5d4143c95673cba6"
+
 PLAYERS_API_BASE = "https://z519wdyajg.execute-api.us-east-1.amazonaws.com/prod/players"
-PLAYERS_API_OWNED = (f"{PLAYERS_API_BASE}?limit=1500&ownerWalletAddress={OWNER_WALLET}")
+PLAYERS_API_OWNED = f"{PLAYERS_API_BASE}?limit=1500&ownerWalletAddress={OWNER_WALLET}"
+
 MARKETPLACE_API = "https://z519wdyajg.execute-api.us-east-1.amazonaws.com/prod/listings"
 EVENTS_API_BASE = "https://z519wdyajg.execute-api.us-east-1.amazonaws.com/prod/events"
-TIER_THRESH = {'Diamond':[97,93,90,87], 'Platinum':[93,90,87,84], 'Gold':[90,87,84,80], 'Silver':[87,84,80,77], 'Bronze':[84,80,77,74], 'Iron':[80,77,74,70], 'Stone':[77,74,70,66], 'Ice':[74,70,66,61], 'Spark':[70,66,61,57], 'Flint':[66,61,57,52]}
+
+TIER_THRESH = {
+    'Diamond':[97,93,90,87],
+    'Platinum':[93,90,87,84],
+    'Gold':[90,87,84,80],
+    'Silver':[87,84,80,77],
+    'Bronze':[84,80,77,74],
+    'Iron':[80,77,74,70],
+    'Stone':[77,74,70,66],
+    'Ice':[74,70,66,61],
+    'Spark':[70,66,61,57],
+    'Flint':[66,61,57,52]
+}
 ATTRIBUTE_WEIGHTS = [4, 3, 2, 1]
-ATTR_MAP = {"PAC": "pace", "SHO": "shooting", "PAS": "passing", "DRI": "dribbling", "DEF": "defense", "PHY": "physical", "GK": "goalkeeping"}
-COUNTRY_CODES = { "SAUDI_ARABIA": "sa", "ENGLAND": "gb-eng", "BRAZIL": "br", "ARGENTINA": "ar", "FRANCE": "fr", "GERMANY": "de", "SPAIN": "es", "PORTUGAL": "pt", "NETHERLANDS": "nl", "ITALY": "it" }
-ROLE_DESCRIPTIONS = { "STRIKER": "A lethal finisher, focused on scoring goals.", "WINGER": "A pacey player who attacks from the flanks.", "MIDFIELDER": "A versatile player who controls the tempo.", "DEFENDER": "A solid player focused on stopping attacks.", "GOALKEEPER": "The last line of defense." }
+ATTR_MAP = {
+    "PAC": "pace", "SHO": "shooting", "PAS": "passing", "DRI": "dribbling",
+    "DEF": "defense", "PHY": "physical", "GK": "goalkeeping"
+}
+COUNTRY_CODES = {
+    "SAUDI_ARABIA": "sa", "ENGLAND": "gb-eng", "BRAZIL": "br", "ARGENTINA": "ar",
+    "FRANCE": "fr", "GERMANY": "de", "SPAIN": "es", "PORTUGAL": "pt",
+    "NETHERLANDS": "nl", "ITALY": "it"
+}
+ROLE_DESCRIPTIONS = {
+    "STRIKER": "A lethal finisher, focused on scoring goals.",
+    "WINGER": "A pacey player who attacks from the flanks.",
+    "MIDFIELDER": "A versatile player who controls the tempo.",
+    "DEFENDER": "A solid player focused on stopping attacks.",
+    "GOALKEEPER": "The last line of defense."
+}
 
-# --- Data Loading ---
-def load_roles():
-    with open(ROLES_PATH, "r", encoding="utf-8") as f: return json.load(f)
-def load_formations():
-    with open(FORMATIONS_PATH, "r", encoding="utf-8") as f: return json.load(f)
-def load_squads():
+# ----------------------------
+# File helpers
+# ----------------------------
+def load_json(path, default):
     try:
-        with open(SQUADS_PATH, "r", encoding="utf-8") as f: return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError): return {}
+        if not os.path.exists(path):
+            return default
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except json.JSONDecodeError:
+        return default
 
-def save_squads(squads_data):
-    with open(SQUADS_PATH, "w", encoding="utf-8") as f:
-        json.dump(squads_data, f, indent=4)
-ROLES_DATA = load_roles()
-FORMATION_MAPS = load_formations()
-SAVED_SQUADS = load_squads()
-ROLE_LOOKUP = {(r.get("Role") or r.get("RoleType") or "").strip().upper(): r for r in ROLES_DATA}
+def save_json(path, data):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+def load_roles() -> List[Dict[str, Any]]:
+    return load_json(ROLES_PATH, [])
+
+def load_formations() -> Dict[str, Any]:
+    return load_json(FORMATIONS_PATH, {})
+
+def load_squads() -> Dict[str, Any]:
+    return load_json(SQUADS_PATH, {})
+
+def save_roles(roles_data: List[Dict[str, Any]]):
+    save_json(ROLES_PATH, roles_data)
+    global ROLES_DATA, ROLE_LOOKUP
+    ROLES_DATA = roles_data
+    ROLE_LOOKUP = {
+        (r.get("Role") or r.get("RoleType") or "").strip().upper(): r
+        for r in ROLES_DATA
+    }
+
+def save_formations(formation_maps: Dict[str, Any]):
+    save_json(FORMATIONS_PATH, formation_maps)
+    global FORMATION_MAPS
+    FORMATION_MAPS = formation_maps
+
+def save_squads(squads_data: Dict[str, Any]):
+    save_json(SQUADS_PATH, squads_data)
+
+# ----------------------------
+# App init / globals
+# ----------------------------
+ROLES_DATA: List[Dict[str, Any]] = load_roles()
+FORMATION_MAPS: Dict[str, Any] = load_formations()
+SAVED_SQUADS: Dict[str, Any] = load_squads()
+ROLE_LOOKUP: Dict[str, Dict[str, Any]] = {
+    (r.get("Role") or r.get("RoleType") or "").strip().upper(): r
+    for r in ROLES_DATA
+}
+
 app = FastAPI()
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], allow_credentials=True,
+    allow_methods=["*"], allow_headers=["*"]
+)
 
-# --- Pydantic Models ---
+# ----------------------------
+# Models
+# ----------------------------
 class Club(BaseModel):
     club_name: str
     tier: str = "Iron"
     roster: List[int] = []
+
+class PlayerIds(BaseModel):
+    player_ids: List[int]
+
 class PlayerAssignmentRequest(BaseModel):
     player_id: int
     old_club_name: str
     new_club_name: str
+
+class PlayerSearchRequest(BaseModel):
+    role_name: str
+    auth_token: str
+    tier: str
+    # optional filters from UI
+    positions: Optional[List[str]] = None
+    paceMin: Optional[int] = None
+    shootingMin: Optional[int] = None
+    passingMin: Optional[int] = None
+    dribblingMin: Optional[int] = None
+    defenseMin: Optional[int] = None
+    physicalMin: Optional[int] = None
+    goalkeepingMin: Optional[int] = None
+    sort_by: Optional[str] = None         # e.g., 'listing.price'
+    sort_order: Optional[str] = None      # 'ASC' or 'DESC'
 
 class SimulationRequest(BaseModel):
     player_ids: List[int]
     role_map: Dict[str, str]
     tier: str
 
-# --- Data Fetch & Scoring ---
-def fetch_player_listing(player_id: int) -> Dict:
+# ----------------------------
+# External fetch helpers
+# ----------------------------
+def fetch_player_listing(player_id: int) -> Optional[Dict[str, Any]]:
     try:
         r = requests.get(f"{MARKETPLACE_API}?playerId={player_id}", timeout=10)
         r.raise_for_status()
@@ -74,84 +167,132 @@ def fetch_single_player(player_id: int, as_series=False):
         r.raise_for_status()
         data = r.json()
         player_data = data.get("player")
-        if not player_data: return None
+        if not player_data:
+            return None
         if as_series:
             m = player_data.get("metadata", {})
             positions_raw = m.get("positions", [])
             positions_norm = [(pos or "").strip().upper() for pos in positions_raw]
-            player_dict = { "id": player_data.get("id"), "firstName": m.get("firstName", ""), "lastName": m.get("lastName", ""),"age": m.get("age", 0), "positions": positions_norm, "overall": m.get("overall", 0), "pace": m.get("pace", 0), "shooting": m.get("shooting", 0), "passing": m.get("passing", 0), "dribbling": m.get("dribbling", 0), "defense": m.get("defense", 0), "physical": m.get("physical", 0), "goalkeeping": m.get("goalkeeping", 0) }
+            player_dict = {
+                "id": player_data.get("id"),
+                "firstName": m.get("firstName", ""),
+                "lastName": m.get("lastName", ""),
+                "age": m.get("age", 0),
+                "positions": positions_norm,
+                "overall": m.get("overall", 0),
+                "pace": m.get("pace", 0),
+                "shooting": m.get("shooting", 0),
+                "passing": m.get("passing", 0),
+                "dribbling": m.get("dribbling", 0),
+                "defense": m.get("defense", 0),
+                "physical": m.get("physical", 0),
+                "goalkeeping": m.get("goalkeeping", 0),
+            }
             return pd.Series(player_dict)
         return player_data
     except requests.exceptions.RequestException:
         return None
 
 def fetch_players() -> pd.DataFrame:
-    r = requests.get(PLAYERS_API_OWNED, timeout=30)
-    players = []
-    if r.ok:
+    try:
+        r = requests.get(PLAYERS_API_OWNED, timeout=30)
+        r.raise_for_status()
         data = r.json()
         data_list = data if isinstance(data, list) else data.get("players", [])
-        for p in data_list:
-            player_id = p.get("id")
-            if player_id is None: continue
-            m = p.get("metadata", {})
-            positions_raw = m.get("positions", [])
-            positions_norm = [(pos or "").strip().upper() for pos in positions_raw]
-            players.append({ "id": int(player_id), "firstName": m.get("firstName", ""), "lastName": m.get("lastName", ""),"age": m.get("age", 0), "positions": positions_norm, "overall": m.get("overall", 0), "pace": m.get("pace", 0), "shooting": m.get("shooting", 0), "passing": m.get("passing", 0), "dribbling": m.get("dribbling", 0), "defense": m.get("defense", 0), "physical": m.get("physical", 0), "goalkeeping": m.get("goalkeeping", 0) })
+    except requests.exceptions.RequestException:
+        data_list = []
+
+    players = []
+    for p in data_list:
+        player_id = p.get("id")
+        if player_id is None:
+            continue
+        m = p.get("metadata", {})
+        positions_raw = m.get("positions", [])
+        positions_norm = [(pos or "").strip().upper() for pos in positions_raw]
+        players.append({
+            "id": int(player_id),
+            "firstName": m.get("firstName", ""),
+            "lastName": m.get("lastName", ""),
+            "age": m.get("age", 0),
+            "positions": positions_norm,
+            "overall": m.get("overall", 0),
+            "pace": m.get("pace", 0),
+            "shooting": m.get("shooting", 0),
+            "passing": m.get("passing", 0),
+            "dribbling": m.get("dribbling", 0),
+            "defense": m.get("defense", 0),
+            "physical": m.get("physical", 0),
+            "goalkeeping": m.get("goalkeeping", 0),
+        })
     return pd.DataFrame(players)
 
+# ----------------------------
+# Fit / scoring
+# ----------------------------
 def calc_fit(player: pd.Series, role_name: str, tier: str):
     role_key = (role_name or "").strip().upper()
     role = ROLE_LOOKUP.get(role_key)
-    if not role: return -999, "Unknown", ""
+    if not role:
+        return -999, "Unknown", ""
     thresholds = TIER_THRESH.get(tier, TIER_THRESH["Iron"])
     need_pos = (role.get("Position", "") or "").strip().upper()
     player_pos = {(p or "").strip().upper() for p in (player.get("positions") or [])}
-    if need_pos and need_pos not in player_pos: return -999, "Unusable", ""
+    if need_pos and need_pos not in player_pos:
+        return -999, "Unusable", ""
     score = 0
     for i, attr_field in enumerate(["Attribute1", "Attribute2", "Attribute3", "Attribute4"]):
         code = (role.get(attr_field) or "").strip().upper()
-        if not code: continue
+        if not code:
+            continue
         player_attr_col = ATTR_MAP.get(code)
-        if not player_attr_col: continue
+        if not player_attr_col:
+            continue
         val = player.get(player_attr_col, 0) or 0
         score += (val - thresholds[i]) * ATTRIBUTE_WEIGHTS[i]
-    label = ( "Elite" if score >= 50 else "Strong" if score >= 20 else "Natural" if score >= 0  else "Weak" if score >= -20 else "Unusable" )
+    label = ("Elite" if score >= 50 else
+             "Strong" if score >= 20 else
+             "Natural" if score >= 0 else
+             "Weak" if score >= -20 else
+             "Unusable")
     description = ROLE_DESCRIPTIONS.get(role_key, "No description available.")
     return int(score), label, description
 
 def calculate_best_role_for_player(player_series: pd.Series) -> pd.Series:
     sorted_tiers = list(TIER_THRESH.keys())
     player_pos = {(p or "").strip().upper() for p in (player_series.get("positions") or [])}
-    
+
     for tier in sorted_tiers:
         best_role_for_tier = None
         max_score_for_tier = -1
 
         for role_data in ROLES_DATA:
             role_name = (role_data.get("Role") or role_data.get("RoleType") or "").strip().upper()
-            if not role_name: continue
+            if not role_name:
+                continue
 
             role_info = ROLE_LOOKUP.get(role_name)
             if not role_info:
                 continue
-            
+
             required_pos = (role_info.get("Position", "") or "").strip().upper()
             if required_pos and required_pos not in player_pos:
                 continue
-            
-            score, label, _ = calc_fit(player_series, role_name, tier)
-            
+
+            score, _, _ = calc_fit(player_series, role_name, tier)
+
             if score > max_score_for_tier:
                 max_score_for_tier = score
                 best_role_for_tier = role_name
-        
+
         if max_score_for_tier >= 0:
             return pd.Series([tier, best_role_for_tier], index=['bestTier', 'bestRole'])
 
     return pd.Series(["Unrated", "N/A"], index=['bestTier', 'bestRole'])
 
-# --- Endpoints ---
+# ----------------------------
+# Read-only endpoints
+# ----------------------------
 @app.get("/roles")
 def get_roles():
     return ROLES_DATA
@@ -166,6 +307,137 @@ def get_formation_map(formation_name: str):
         return FORMATION_MAPS[formation_name]
     raise HTTPException(status_code=404, detail="Formation not found")
 
+@app.get("/tiers")
+def get_tiers():
+    return {"tiers": TIER_THRESH}
+
+# ----------------------------
+# Player analysis endpoints
+# ----------------------------
+@app.get("/player/{player_id}/card-analysis")
+def get_player_card_analysis(player_id: int):
+    player_data = fetch_single_player(player_id, as_series=False)
+    if not player_data:
+        raise HTTPException(status_code=404, detail="Player not found")
+
+    listing_data = fetch_player_listing(player_id)
+    nationality = player_data.get("metadata", {}).get("nationalities", [None])[0]
+    country_code = COUNTRY_CODES.get(nationality, "")
+
+    return {
+        "id": player_data.get("id"),
+        "metadata": player_data.get("metadata", {}),
+        "activeContract": player_data.get("activeContract", {}),
+        "listing": listing_data,
+        "country_code": country_code
+    }
+
+@app.get("/player/{player_id}/role-analysis")
+def get_player_role_analysis(player_id: int):
+    player_series = fetch_single_player(player_id, as_series=True)
+    if player_series is None or player_series.empty:
+        raise HTTPException(status_code=404, detail="Player not found")
+
+    all_positive_roles_by_tier = {}
+    overall_best_role = None
+
+    for tier_name in TIER_THRESH.keys():
+        all_role_scores_for_tier = []
+        for role_data in ROLES_DATA:
+            role_name = (role_data.get("Role") or role_data.get("RoleType") or "").strip().upper()
+            score, label, description = calc_fit(player_series, role_name, tier_name)
+            if label != "Unusable":
+                all_role_scores_for_tier.append({
+                    "role": role_name,
+                    "score": score,
+                    "label": label,
+                    "description": description,
+                    "position": role_data.get("Position", ""),
+                    "tier": tier_name
+                })
+
+        all_role_scores_for_tier.sort(key=lambda x: x["score"], reverse=True)
+        positive_roles_for_tier = [r for r in all_role_scores_for_tier if r["score"] >= 0]
+
+        if positive_roles_for_tier:
+            all_positive_roles_by_tier[tier_name] = positive_roles_for_tier
+            if overall_best_role is None:
+                overall_best_role = positive_roles_for_tier[0]
+
+    return {
+        "player_attributes": player_series.to_dict(),
+        "overall_best_role": overall_best_role,
+        "all_positive_roles_by_tier": all_positive_roles_by_tier
+    }
+
+# ----------------------------
+# Agency / clubs
+# ----------------------------
+@app.get("/players/owned")
+def get_owned_players_with_club_assignment():
+    players_df = fetch_players()
+    if players_df.empty:
+        return []
+
+    sorted_tiers = list(TIER_THRESH.keys())
+
+    def find_best_fit(player_series):
+        player_pos = {(p or "").strip().upper() for p in (player_series.get("positions") or [])}
+        for tier in sorted_tiers:
+            best_role_for_tier = None
+            max_score_for_tier = -1
+            for role_data in ROLES_DATA:
+                role_name = (role_data.get("Role") or role_data.get("RoleType") or "").strip().upper()
+                if not role_name:
+                    continue
+                role_info = ROLE_LOOKUP.get(role_name)
+                if not role_info:
+                    continue
+                required_pos = (role_info.get("Position", "") or "").strip().upper()
+                if required_pos and required_pos not in player_pos:
+                    continue
+                score, _, _ = calc_fit(player_series, role_name, tier)
+                if score > max_score_for_tier:
+                    max_score_for_tier = score
+                    best_role_for_tier = role_name
+            if max_score_for_tier >= 0:
+                return pd.Series([tier, best_role_for_tier], index=['bestTier', 'bestRole'])
+        return pd.Series(["Unrated", "N/A"], index=['bestTier', 'bestRole'])
+
+    best_fit_df = players_df.apply(find_best_fit, axis=1)
+    players_df = pd.concat([players_df, best_fit_df], axis=1)
+
+    squads = load_squads()
+    player_to_club_map = {}
+    for club_name, club_data in squads.items():
+        roster_ids = club_data.get("roster", []) if isinstance(club_data, dict) else club_data
+        for pid in roster_ids:
+            player_to_club_map[int(pid)] = club_name
+    players_df['assigned_club'] = players_df['id'].map(player_to_club_map).fillna("Unassigned")
+    return json.loads(players_df.to_json(orient="records"))
+
+@app.post("/players/by_ids")
+def get_players_by_ids(player_ids_model: PlayerIds):
+    player_ids = player_ids_model.player_ids
+    players_df = fetch_players()
+    if players_df.empty:
+        return []
+    roster_players = players_df[players_df['id'].isin(player_ids)].copy()
+    best_fit_df = roster_players.apply(calculate_best_role_for_player, axis=1)
+    roster_players = pd.concat([roster_players, best_fit_df], axis=1)
+    return json.loads(roster_players.to_json(orient="records"))
+
+@app.get("/clubs")
+def get_clubs() -> List[Club]:
+    squads_data = load_squads()
+    club_list = []
+    for club_name, club_data in squads_data.items():
+        if isinstance(club_data, dict) and "club_name" in club_data:
+            club_list.append(club_data)
+        elif isinstance(club_data, list):
+            club_list.append({"club_name": club_name, "tier": "Iron", "roster": club_data})
+    return club_list
+
 @app.get("/clubs/{club_name}")
 def get_club_by_name(club_name: str):
     squads_data = load_squads()
@@ -174,12 +446,17 @@ def get_club_by_name(club_name: str):
         if isinstance(club_data, dict):
             return club_data
         elif isinstance(club_data, list):
-            return {
-                "club_name": club_name,
-                "tier": "Iron",
-                "roster": club_data
-            }
+            return {"club_name": club_name, "tier": "Iron", "roster": club_data}
     raise HTTPException(status_code=404, detail="Club not found")
+
+@app.post("/clubs")
+def create_club(club: Club):
+    squads_data = load_squads()
+    if club.club_name in squads_data:
+        raise HTTPException(status_code=400, detail="Club with this name already exists")
+    squads_data[club.club_name] = club.dict()
+    save_squads(squads_data)
+    return club
 
 @app.put("/clubs/{club_name}")
 def update_club_roster(club_name: str, roster: List[int] = Body(...)):
@@ -201,335 +478,142 @@ def delete_club(club_name: str):
         save_squads(squads_data)
         return {"message": f"Club {club_name} deleted successfully."}
     raise HTTPException(status_code=404, detail="Club not found")
-@app.get("/tiers")
-def get_tiers():
-    return {"tiers": TIER_THRESH}
 
-@app.get("/player/{player_id}/card-analysis")
-def get_player_card_analysis(player_id: int):
-    player_data = fetch_single_player(player_id, as_series=False)
-    if not player_data:
-        raise HTTPException(status_code=404, detail="Player not found")
-
-    listing_data = fetch_player_listing(player_id)
-    nationality = player_data.get("metadata", {}).get("nationalities", [None])[0]
-    country_code = COUNTRY_CODES.get(nationality, "")
-
-    response = {
-        "id": player_data.get("id"),
-        "metadata": player_data.get("metadata", {}),
-        "activeContract": player_data.get("activeContract", {}),
-        "listing": listing_data,
-        "country_code": country_code
-    }
-    return response
-
-@app.get("/player/{player_id}/role-analysis")
-def get_player_role_analysis(player_id: int):
-    player_series = fetch_single_player(player_id, as_series=True)
-    if player_series is None or player_series.empty: raise HTTPException(status_code=404, detail="Player not found")
-
-    all_positive_roles_by_tier = {}
-    overall_best_role = None
-
-    for tier_name in TIER_THRESH.keys():
-        all_role_scores_for_tier = []
-        for role_data in ROLES_DATA:
-            role_name = (role_data.get("Role") or role_data.get("RoleType") or "").strip().upper()
-            score, label, description = calc_fit(player_series, role_name, tier_name)
-            if label != "Unusable":
-                all_role_scores_for_tier.append({
-                    "role": role_name,
-                    "score": score,
-                    "label": label,
-                    "description": description,
-                    "position": role_data.get("Position", ""),
-                    "tier": tier_name
-                })
-        
-        all_role_scores_for_tier.sort(key=lambda x: x["score"], reverse=True)
-        positive_roles_for_tier = [r for r in all_role_scores_for_tier if r["score"] >= 0]
-        
-        if positive_roles_for_tier:
-            all_positive_roles_by_tier[tier_name] = positive_roles_for_tier
-            if overall_best_role is None:
-                overall_best_role = positive_roles_for_tier[0]
-
-    return {
-        "player_attributes": player_series.to_dict(),
-        "overall_best_role": overall_best_role,
-        "all_positive_roles_by_tier": all_positive_roles_by_tier
-    }
-
-@app.get("/players/owned")
-def get_owned_players_with_club_assignment():
-    players_df = fetch_players()
-    if players_df.empty:
-        return []
-
-    sorted_tiers = list(TIER_THRESH.keys())
-
-    def find_best_fit(player_series):
-        player_pos = {(p or "").strip().upper() for p in (player_series.get("positions") or [])}
-        for tier in sorted_tiers:
-            best_role_for_tier = None
-            max_score_for_tier = -1
-
-            for role_data in ROLES_DATA:
-                role_name = (role_data.get("Role") or role_data.get("RoleType") or "").strip().upper()
-                if not role_name: continue
-
-                role_info = ROLE_LOOKUP.get(role_name)
-                if not role_info:
-                    continue
-                
-                required_pos = (role_info.get("Position", "") or "").strip().upper()
-                if required_pos and required_pos not in player_pos:
-                    continue
-                
-                score, label, _ = calc_fit(player_series, role_name, tier)
-                
-                if score > max_score_for_tier:
-                    max_score_for_tier = score
-                    best_role_for_tier = role_name
-            
-            if max_score_for_tier >= 0:
-                return pd.Series([tier, best_role_for_tier], index=['bestTier', 'bestRole'])
-
-        return pd.Series(["Unrated", "N/A"], index=['bestTier', 'bestRole'])
-
-    best_fit_df = players_df.apply(find_best_fit, axis=1)
-    players_df = pd.concat([players_df, best_fit_df], axis=1)
-
+@app.post("/players/assign")
+def update_player_assignment(req: PlayerAssignmentRequest):
     squads = load_squads()
-    player_to_club_map = {}
-    for club_name, club_data in squads.items():
-        roster_ids = club_data.get("roster", []) if isinstance(club_data, dict) else club_data
-        for player_id in roster_ids:
-            player_to_club_map[int(player_id)] = club_name
-    players_df['assigned_club'] = players_df['id'].map(player_to_club_map).fillna("Unassigned")
-    return json.loads(players_df.to_json(orient="records"))
 
-@app.get("/clubs")
-def get_clubs() -> List[Club]:
-    squads_data = load_squads()
-    club_list = []
-    for club_name, club_data in squads_data.items():
-        if isinstance(club_data, dict) and "club_name" in club_data:
-            club_list.append(club_data)
-        elif isinstance(club_data, list):
-            club_list.append({
-                "club_name": club_name,
-                "tier": "Iron",
-                "roster": club_data
-            })
-    return club_list
+    # remove from old
+    if req.old_club_name and req.old_club_name != "Unassigned":
+        old_obj = squads.get(req.old_club_name)
+        if isinstance(old_obj, dict):
+            old_obj["roster"] = [pid for pid in old_obj.get("roster", []) if int(pid) != int(req.player_id)]
+        elif isinstance(old_obj, list):
+            squads[req.old_club_name] = [pid for pid in old_obj if int(pid) != int(req.player_id)]
 
-@app.post("/clubs")
-def create_club(club: Club):
-    squads_data = load_squads()
-    if club.club_name in squads_data:
-        raise HTTPException(status_code=400, detail="Club with this name already exists")
-    squads_data[club.club_name] = club.dict()
-    save_squads(squads_data)
-    return club
+    # add to new
+    if req.new_club_name and req.new_club_name != "Unassigned":
+        new_obj = squads.get(req.new_club_name)
+        if new_obj is None:
+            squads[req.new_club_name] = {"club_name": req.new_club_name, "tier": "Iron", "roster": [req.player_id]}
+        elif isinstance(new_obj, dict):
+            roster = set(int(x) for x in new_obj.get("roster", []))
+            roster.add(int(req.player_id))
+            new_obj["roster"] = list(sorted(roster))
+        else:
+            roster = set(int(x) for x in new_obj)
+            roster.add(int(req.player_id))
+            squads[req.new_club_name] = list(sorted(roster))
 
-class PlayerIds(BaseModel):
-    player_ids: List[int]
+    save_squads(squads)
+    return {"ok": True}
 
-@app.post("/players/by_ids")
-def get_players_by_ids(player_ids_model: PlayerIds):
-    player_ids = player_ids_model.player_ids
-    players_df = fetch_players()
-    if players_df.empty:
-        return []
-    
-    roster_players = players_df[players_df['id'].isin(player_ids)].copy()
-    
-    # Calculate best role for each player in the roster
-    best_fit_df = roster_players.apply(calculate_best_role_for_player, axis=1)
-    roster_players = pd.concat([roster_players, best_fit_df], axis=1)
-
-    return json.loads(roster_players.to_json(orient="records"))
-
-class PlayerSearchRequest(BaseModel):
-    role_name: str
-    auth_token: str
-    tier: str
-    positions: Optional[List[str]] = None
-    paceMin: Optional[int] = None
-    shootingMin: Optional[int] = None
-    passingMin: Optional[int] = None
-    dribblingMin: Optional[int] = None
-    defenseMin: Optional[int] = None
-    physicalMin: Optional[int] = None
-    goalkeepingMin: Optional[int] = None
-    sort_by: Optional[str] = None     # e.g. 'listing.price'
-    sort_order: Optional[str] = None  # 'ASC' or 'DESC'
-
+# ----------------------------
+# Marketplace search proxy (role-aware)
+# ----------------------------
 @app.post("/market/search")
-def search_market(req: PlayerSearchRequest):
-    headers = {"Authorization": f"Bearer {req.auth_token}"}
-
-    # Build external API query
-    external_api_params = {
+def market_search(req: PlayerSearchRequest):
+    params = {
         "limit": 50,
         "type": "PLAYER",
         "status": "AVAILABLE",
-        "view": "full",
+        "view": "full"
     }
-    if req.sort_by:
-        external_api_params["sorts"] = req.sort_by
-    if req.sort_order:
-        external_api_params["sortsOrders"] = (req.sort_order or "").upper()
     if req.positions:
-        external_api_params["positions"] = ",".join(
-            [p.strip().upper() for p in req.positions if p]
-        )
-    if req.paceMin is not None:
-        external_api_params["paceMin"] = req.paceMin
-    if req.shootingMin is not None:
-        external_api_params["shootingMin"] = req.shootingMin
-    if req.passingMin is not None:
-        external_api_params["passingMin"] = req.passingMin
-    if req.dribblingMin is not None:
-        external_api_params["dribblingMin"] = req.dribblingMin
-    if req.defenseMin is not None:
-        external_api_params["defenseMin"] = req.defenseMin
-    if req.physicalMin is not None:
-        external_api_params["physicalMin"] = req.physicalMin
-    if req.goalkeepingMin is not None:
-        external_api_params["goalkeepingMin"] = req.goalkeepingMin
+        params["positions"] = ",".join(req.positions)
+    if req.paceMin is not None: params["paceMin"] = req.paceMin
+    if req.shootingMin is not None: params["shootingMin"] = req.shootingMin
+    if req.passingMin is not None: params["passingMin"] = req.passingMin
+    if req.dribblingMin is not None: params["dribblingMin"] = req.dribblingMin
+    if req.defenseMin is not None: params["defenseMin"] = req.defenseMin
+    if req.physicalMin is not None: params["physicalMin"] = req.physicalMin
+    if req.goalkeepingMin is not None: params["goalkeepingMin"] = req.goalkeepingMin
+    if req.sort_by: params["sorts"] = req.sort_by
+    if req.sort_order: params["sortsOrders"] = req.sort_order
 
     try:
-        r = requests.get(MARKETPLACE_API, headers=headers, params=external_api_params, timeout=30)
+        r = requests.get(MARKETPLACE_API, params=params, timeout=30)
         r.raise_for_status()
-        listings = r.json()
+        return r.json()
     except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=400, detail=f"Failed to fetch marketplace listings: {e}")
+        raise HTTPException(status_code=502, detail=f"External marketplace error: {e}")
 
-    results = []
-    for listing in listings or []:
-        player = (listing or {}).get("player") or {}
-        meta = player.get("metadata") or {}
-        player_id = player.get("id")
-        if player_id is None or not meta:
-            continue
+# ----------------------------
+# Config CRUD + attributes
+# ----------------------------
+@app.get("/attributes")
+def get_attributes():
+    """Return list of attribute codes used by roles."""
+    return {"attributes": list(ATTR_MAP.keys())}
 
-        # Normalise to the fields calc_fit expects
-        positions_raw = meta.get("positions", [])
-        positions_norm = [(p or "").strip().upper() for p in positions_raw]
-        player_dict = {
-            "id": player_id,
-            "firstName": meta.get("firstName", ""),
-            "lastName": meta.get("lastName", ""),
-            "age": meta.get("age", 0),
-            "positions": positions_norm,
-            "overall": meta.get("overall", 0),
-            "pace": meta.get("pace", 0),
-            "shooting": meta.get("shooting", 0),
-            "passing": meta.get("passing", 0),
-            "dribbling": meta.get("dribbling", 0),
-            "defense": meta.get("defense", 0),
-            "physical": meta.get("physical", 0),
-            "goalkeeping": meta.get("goalkeeping", 0),
-        }
-        player_series = pd.Series(player_dict)
+@app.post("/roles")
+def create_role(role: Dict[str, Any]):
+    roles = load_roles()
+    name = (role.get("Role") or role.get("RoleType") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Role name required")
+    name_up = name.upper()
+    if any(((r.get("Role") or r.get("RoleType") or "").strip().upper() == name_up) for r in roles):
+        raise HTTPException(status_code=409, detail="Role already exists")
+    roles.append(role)
+    save_roles(roles)
+    return {"ok": True, "role": role}
 
-        # Fit for requested role/tier using TIER_THRESH + role Attribute1..4
-        score, label, _ = calc_fit(player_series, req.role_name, req.tier)
+@app.put("/roles/{original_name}")
+def update_role(original_name: str, role: Dict[str, Any]):
+    roles = load_roles()
+    target_up = original_name.strip().upper()
+    idx = next(
+        (i for i, r in enumerate(roles)
+         if (r.get("Role") or r.get("RoleType") or "").strip().upper() == target_up),
+        None
+    )
+    if idx is None:
+        raise HTTPException(status_code=404, detail="Role not found")
+    roles[idx] = role
+    save_roles(roles)
+    return {"ok": True, "role": role}
 
-        if score >= 0:
-            player_data = {**player_dict, "fit_score": int(score), "fit_label": label}
-            results.append({
-                "listingResourceId": listing.get("listingResourceId"),
-                "status": listing.get("status"),
-                "price": listing.get("price"),
-                "player": {
-                    "id": player_id,
-                    "metadata": player_data
-                },
-                "sellerAddress": listing.get("sellerAddress"),
-                "sellerName": listing.get("sellerName"),
-                "createdDateTime": listing.get("createdDateTime"),
-            })
+@app.delete("/roles/{role_name}")
+def delete_role(role_name: str):
+    roles = load_roles()
+    target_up = role_name.strip().upper()
+    new_roles = [
+        r for r in roles
+        if (r.get("Role") or r.get("RoleType") or "").strip().upper() != target_up
+    ]
+    if len(new_roles) == len(roles):
+        raise HTTPException(status_code=404, detail="Role not found")
+    save_roles(new_roles)
+    return {"ok": True}
 
-    return results
+@app.post("/formations")
+def create_formation(payload: Dict[str, Any]):
+    formation_name = (payload.get("formationName") or payload.get("name") or "").strip()
+    roles_map = payload.get("roles") or payload.get("mapping") or payload.get("positions")
+    if not formation_name or roles_map is None:
+        raise HTTPException(status_code=400, detail="formationName and roles are required")
+    formations = load_formations()
+    if formation_name in formations:
+        raise HTTPException(status_code=409, detail="Formation already exists")
+    formations[formation_name] = roles_map
+    save_formations(formations)
+    return {"ok": True, "formationName": formation_name, "roles": roles_map}
 
+@app.put("/formations/{formation_name}")
+def update_formation(formation_name: str, roles_map: Dict[str, Any] = Body(...)):
+    formations = load_formations()
+    if formation_name not in formations:
+        raise HTTPException(status_code=404, detail="Formation not found")
+    formations[formation_name] = roles_map
+    save_formations(formations)
+    return {"ok": True, "formationName": formation_name, "roles": roles_map}
 
-@app.post("/players/assign")
-def assign_player_club(req: PlayerAssignmentRequest):
-    squads = load_squads()
-
-    def get_roster(club_name):
-        if club_name not in squads: return None
-        club_data = squads[club_name]
-        if isinstance(club_data, dict): return club_data.get("roster", [])
-        elif isinstance(club_data, list): return club_data
-        return None
-
-    def update_roster(club_name, new_roster):
-        if club_name not in squads: return
-        club_data = squads[club_name]
-        if isinstance(club_data, dict): club_data["roster"] = new_roster
-        elif isinstance(club_data, list): squads[club_name] = new_roster
-
-    if req.old_club_name != "Unassigned":
-        old_roster = get_roster(req.old_club_name)
-        if old_roster is not None and req.player_id in old_roster:
-            old_roster.remove(req.player_id)
-            update_roster(req.old_club_name, old_roster)
-
-    if req.new_club_name != "Unassigned":
-        new_roster = get_roster(req.new_club_name)
-        if new_roster is not None and req.player_id not in new_roster:
-            new_roster.append(req.player_id)
-            update_roster(req.new_club_name, new_roster)
-
-    save_squads(squads)
-    return {"message": f"Player {req.player_id} assignment updated."}
-
-@app.post("/squads/simulate")
-def simulate_squad(req: SimulationRequest):
-    players_df = fetch_players()
-    if players_df.empty:
-        raise HTTPException(status_code=400, detail="No players available for simulation.")
-
-    roster_players = players_df[players_df['id'].isin(req.player_ids)].copy()
-    if roster_players.empty:
-        raise HTTPException(status_code=400, detail="None of the selected players could be found.")
-
-    squad = []
-    for slot, role_name in req.role_map.items():
-        best_player_for_slot = None
-        highest_score = -1
-
-        # Find the best player for the current slot
-        for _, player in roster_players.iterrows():
-            score, label, _ = calc_fit(player, role_name, req.tier)
-            if score > highest_score:
-                highest_score = score
-                best_player_for_slot = player
-
-        # Add the best player to the squad and remove them from the available roster
-        if best_player_for_slot is not None:
-            squad.append({
-                "slot": slot,
-                "assigned_role": role_name,
-                "player_id": best_player_for_slot['id'],
-                "player_name": f"{best_player_for_slot['firstName']} {best_player_for_slot['lastName']}",
-                "fit_score": highest_score,
-                "fit_label": "Elite" if highest_score >= 50 else "Strong" if highest_score >= 20 else "Natural" if highest_score >= 0 else "Weak" if highest_score >= -20 else "Unusable"
-            })
-            roster_players = roster_players[roster_players['id'] != best_player_for_slot['id']]
-        else:
-            squad.append({
-                "slot": slot,
-                "assigned_role": role_name,
-                "player_id": None,
-                "player_name": "—",
-                "fit_score": None,
-                "fit_label": "No suitable player"
-            })
-            
-    return {"squad": squad}
+@app.delete("/formations/{formation_name}")
+def delete_formation(formation_name: str):
+    formations = load_formations()
+    if formation_name not in formations:
+        raise HTTPException(status_code=404, detail="Formation not found")
+    formations.pop(formation_name, None)
+    save_formations(formations)
+    return {"ok": True}
